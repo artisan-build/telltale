@@ -8,6 +8,7 @@ use App\Domain\Ingest\CredentialAuthenticator;
 use App\Domain\Ingest\EventIngestor;
 use App\Domain\Ingest\IngestRequestLimiter;
 use App\Exceptions\InvalidIngestCredential;
+use App\Http\Middleware\EnforceIngestBodyLimit;
 use ArtisanBuild\TelltaleContracts\ContractException;
 use ArtisanBuild\TelltaleContracts\EnvelopeV1;
 use Illuminate\Http\JsonResponse;
@@ -34,7 +35,8 @@ final class IngestController extends Controller
         $limiter->consumeInstall($install->app, (string) $install->id);
 
         try {
-            $decoded = json_decode($request->getContent(), flags: JSON_THROW_ON_ERROR);
+            $body = $request->attributes->get(EnforceIngestBodyLimit::BODY_ATTRIBUTE);
+            $decoded = json_decode(is_string($body) ? $body : $request->getContent(), flags: JSON_THROW_ON_ERROR);
         } catch (JsonException) {
             return response()->json(['message' => 'The envelope is not valid JSON.'], 422);
         }
