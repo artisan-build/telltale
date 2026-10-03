@@ -10,7 +10,7 @@ use InvalidArgumentException;
 
 final class AppManager
 {
-    public const MAX_NAME_LENGTH = 255;
+    public const int MAX_NAME_LENGTH = 255;
 
     /**
      * @param  array{rate_per_minute?: int, install_rate_per_minute?: int, daily_event_cap?: int, install_daily_event_cap?: int}  $limits
