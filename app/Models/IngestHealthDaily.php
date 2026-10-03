@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $health_date
  * @property int $rejection_count
  * @property int $rate_limit_count
+ *
+ * @mixin IdeHelperIngestHealthDaily
  */
 final class IngestHealthDaily extends Model
 {

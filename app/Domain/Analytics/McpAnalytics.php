@@ -70,7 +70,7 @@ final readonly class McpAnalytics
             ->where('occurred_at', '>=', $from)
             ->selectRaw('client_version, MAX(occurred_at) AS last_seen_at')
             ->groupBy('client_version')
-            ->orderByDesc('last_seen_at')
+            ->latest('last_seen_at')
             ->limit(25)
             ->get()
             ->map(fn (StoredEvent $event): array => [
@@ -143,7 +143,7 @@ final readonly class McpAnalytics
             ->where('active_date', '>=', $from)
             ->selectRaw('active_date, app_version, COUNT(DISTINCT install_id) AS active_installs')
             ->groupBy('active_date', 'app_version')
-            ->orderBy('active_date')
+            ->oldest('active_date')
             ->orderBy('app_version')
             ->limit(2501)
             ->get();
@@ -300,7 +300,7 @@ final readonly class McpAnalytics
         $groups = ErrorGroup::query()
             ->where('app_id', $app->id)
             ->where('last_seen_at', '>=', $from)
-            ->orderByDesc('last_seen_at')
+            ->latest('last_seen_at')
             ->orderBy('id')
             ->limit($limit)
             ->get();
@@ -368,7 +368,7 @@ final readonly class McpAnalytics
             'app_id' => $app->id,
             'install_id' => $installUuid,
             'session_id' => $sessionId,
-            'events' => $query->orderBy('occurred_at')->orderBy('id')->limit($limit)->get()
+            'events' => $query->oldest('occurred_at')->orderBy('id')->limit($limit)->get()
                 ->map(fn (StoredEvent $event): array => [
                     'event_id' => $event->event_id,
                     'name' => $event->name,
