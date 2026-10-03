@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Ingest;
 
 use App\Exceptions\IngestRateExceeded;
+use App\Exceptions\InvalidIngestConfiguration;
 use App\Models\TrackedApp;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ final readonly class IngestRequestLimiter
         $maximum = config('telltale.ingest.ip_rate_per_minute');
 
         if (! is_int($maximum) || $maximum < 1) {
-            return;
+            throw new InvalidIngestConfiguration;
         }
 
         $this->consume('telltale:ip:'.$this->opaque((string) $request->ip()), $maximum);

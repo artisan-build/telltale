@@ -122,7 +122,21 @@ it('rejects invalid event scalar values', function (array $event): void {
     'invalid timestamp syntax' => [validEvent(['ts' => '2026-10-03 12:34:56'])],
     'empty name' => [validEvent(['name' => ''])],
     'empty session' => [validEvent(['session_id' => ''])],
+    'overlong name' => [validEvent(['name' => str_repeat('n', Event::MAX_NAME_LENGTH + 1)])],
+    'overlong session' => [validEvent(['session_id' => str_repeat('s', Event::MAX_SESSION_ID_LENGTH + 1)])],
 ]);
+
+it('accepts database-backed strings at their upper boundaries', function (): void {
+    $payload = validEnvelope([
+        'client_version' => str_repeat('v', EnvelopeV1::MAX_CLIENT_VERSION_LENGTH),
+        'events' => [validEvent([
+            'name' => str_repeat('n', Event::MAX_NAME_LENGTH),
+            'session_id' => str_repeat('s', Event::MAX_SESSION_ID_LENGTH),
+        ])],
+    ]);
+
+    expect(EnvelopeV1::fromArray($payload)->toArray())->toBe($payload);
+});
 
 it('rejects invalid envelope and event shapes', function (array $payload): void {
     EnvelopeV1::fromArray($payload);
@@ -236,6 +250,24 @@ it('rejects non-finite and non-JSON property values', function (mixed $value): v
     'invalid UTF-8 string' => ["\xB1\x31"],
 ]);
 
+it('rejects NUL bytes from PostgreSQL-backed text and JSON values', function (): void {
+    $payloads = [
+        validEnvelope(['client_version' => "1.0\0invalid"]),
+        validEnvelope(['events' => [validEvent(['name' => "name\0invalid"])]]),
+        validEnvelope(['events' => [validEvent(['session_id' => "session\0invalid"])]]),
+        validEnvelope(['events' => [validEvent(['props' => ["key\0invalid" => true]])]]),
+        validEnvelope(['events' => [validEvent(['props' => ['value' => "text\0invalid"]])]]),
+        validEnvelope(['events' => [validEvent([
+            'type' => 'error',
+            'error' => validError(['message' => "message\0invalid"]),
+        ])]]),
+    ];
+
+    foreach ($payloads as $payload) {
+        expect(fn () => EnvelopeV1::fromArray($payload))->toThrow(ContractException::class);
+    }
+});
+
 it('accepts zero and positive cumulative dropped counts', function (int $count): void {
     expect(EnvelopeV1::fromArray(validEnvelope(['dropped_events_total' => $count]))->droppedEventsTotal)
         ->toBe($count);
@@ -255,6 +287,7 @@ it('rejects invalid client versions', function (mixed $version): void {
     'empty' => [''],
     'integer' => [1],
     'invalid UTF-8' => ["\xB1\x31"],
+    'overlong' => [str_repeat('v', EnvelopeV1::MAX_CLIENT_VERSION_LENGTH + 1)],
 ]);
 
 it('never admits identity or credential fields into the body', function (): void {

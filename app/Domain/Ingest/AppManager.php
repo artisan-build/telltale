@@ -10,6 +10,8 @@ use InvalidArgumentException;
 
 final class AppManager
 {
+    public const MAX_NAME_LENGTH = 255;
+
     /**
      * @param  array{rate_per_minute?: int, install_rate_per_minute?: int, daily_event_cap?: int, install_daily_event_cap?: int}  $limits
      */
@@ -17,6 +19,14 @@ final class AppManager
     {
         if (trim($name) === '') {
             throw new InvalidArgumentException('The app name must not be empty.');
+        }
+
+        if (preg_match('//u', $name) !== 1 || str_contains($name, "\0")) {
+            throw new InvalidArgumentException('The app name must be valid text.');
+        }
+
+        if (strlen($name) > self::MAX_NAME_LENGTH) {
+            throw new InvalidArgumentException('The app name must not exceed 255 bytes.');
         }
 
         $credential = Credential::issue('tti');

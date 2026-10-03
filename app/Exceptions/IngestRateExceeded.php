@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use Illuminate\Contracts\Debug\ShouldntReport;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
 
-final class IngestRateExceeded extends RuntimeException
+final class IngestRateExceeded extends RuntimeException implements ShouldntReport
 {
     public function __construct(private readonly int $retryAfter)
     {

@@ -23,7 +23,6 @@ final class IngestController extends Controller
         IngestRequestLimiter $limiter,
         EventIngestor $ingestor,
     ): JsonResponse {
-        $limiter->consumeIp($request);
         $token = (string) $request->bearerToken();
         $install = $authenticator->install($token);
 

@@ -62,7 +62,7 @@ final class EventIngestor
 
             if ($appCount + $newCount > $app->daily_event_cap
                 || $installCount + $newCount > $app->install_daily_event_cap) {
-                throw new IngestVolumeExceeded;
+                throw new IngestVolumeExceeded(max(1, $dayEnd->getTimestamp() - $now->getTimestamp()));
             }
 
             foreach ($uniqueEvents as $event) {

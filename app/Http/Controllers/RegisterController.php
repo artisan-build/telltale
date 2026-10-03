@@ -22,7 +22,6 @@ final class RegisterController extends Controller
         IngestRequestLimiter $limiter,
         InstallRegistrar $registrar,
     ): JsonResponse {
-        $limiter->consumeIp($request);
         $ingestValue = (string) $request->header('X-Telltale-Ingest', '');
         $app = $authenticator->app($ingestValue);
 

@@ -63,12 +63,17 @@ function ingestEnvelope(array $events = [], int $dropped = 0, array $overrides =
     ], $overrides);
 }
 
-it('registers without resolving a user and retries by rotating the install token', function (): void {
+function useExplodingDefaultGuard(): void
+{
     Auth::extend('exploding', fn (): never => throw new RuntimeException('A public route resolved the auth guard.'));
     config([
         'auth.defaults.guard' => 'exploding',
         'auth.guards.exploding' => ['driver' => 'exploding'],
     ]);
+}
+
+it('registers without resolving a user and retries by rotating the install token', function (): void {
+    useExplodingDefaultGuard();
     [$app, $ingestValue] = createIngestApp();
     $uuid = (string) Str::uuid();
 
@@ -182,18 +187,51 @@ it('rejects malformed and unsupported envelopes with actionable validation error
         ->assertJson(['message' => 'events must be a list.']);
 });
 
-it('enforces the body cap before credential lookup and the batch cap before contract parsing', function (): void {
+it('accepts storage string boundaries and rejects overlong or NUL values with 422', function (): void {
+    [, $ingestValue] = createIngestApp();
+    $token = registerInstall($ingestValue)['install_token'];
+
+    $this->withToken($token)->postJson('/api/ingest', ingestEnvelope([
+        ingestEvent(overrides: [
+            'name' => str_repeat('n', 255),
+            'session_id' => str_repeat('s', 255),
+        ]),
+    ], overrides: ['client_version' => str_repeat('v', 255)]))->assertAccepted();
+
+    foreach ([
+        ingestEnvelope([ingestEvent(overrides: ['name' => str_repeat('n', 256)])]),
+        ingestEnvelope([ingestEvent(overrides: ['session_id' => str_repeat('s', 256)])]),
+        ingestEnvelope(overrides: ['client_version' => str_repeat('v', 256)]),
+        ingestEnvelope([ingestEvent(overrides: ['props' => ['invalid' => "before\0after"]])]),
+    ] as $payload) {
+        $this->withToken($token)->postJson('/api/ingest', $payload)->assertUnprocessable();
+    }
+
+    expect(StoredEvent::query()->count())->toBe(1);
+});
+
+it('counts oversized requests against the IP cap before enforcing body and credential bounds', function (): void {
+    useExplodingDefaultGuard();
     config([
         'telltale.ingest.max_body_bytes' => 20,
         'telltale.ingest.max_events_per_batch' => 1,
+        'telltale.ingest.ip_rate_per_minute' => 1,
     ]);
 
     $this->call('POST', '/api/ingest', server: [
         'CONTENT_TYPE' => 'application/json',
         'CONTENT_LENGTH' => 21,
     ], content: str_repeat('x', 21))->assertStatus(413);
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'CONTENT_LENGTH' => 21,
+    ], content: str_repeat('x', 21))->assertTooManyRequests();
 
-    config(['telltale.ingest.max_body_bytes' => 100_000]);
+    RateLimiter::clear('telltale:ip:'.hash_hmac('sha256', '127.0.0.1', (string) config('app.key')));
+    config([
+        'telltale.ingest.max_body_bytes' => 100_000,
+        'telltale.ingest.ip_rate_per_minute' => 240,
+    ]);
     [, $ingestValue] = createIngestApp();
     $token = registerInstall($ingestValue)['install_token'];
     $payload = ingestEnvelope([
@@ -207,10 +245,11 @@ it('enforces the body cap before credential lookup and the batch cap before cont
 });
 
 it('enforces atomic IP app and install minute limits', function (): void {
+    useExplodingDefaultGuard();
     config(['telltale.ingest.ip_rate_per_minute' => 1]);
 
     $this->postJson('/api/register', [])->assertUnauthorized();
-    $this->postJson('/api/register', [])->assertTooManyRequests();
+    $this->postJson('/api/register', [])->assertTooManyRequests()->assertHeader('Retry-After');
 
     RateLimiter::clear('telltale:ip:'.hash_hmac('sha256', '127.0.0.1', (string) config('app.key')));
     config(['telltale.ingest.ip_rate_per_minute' => 240]);
@@ -236,16 +275,18 @@ it('enforces atomic IP app and install minute limits', function (): void {
 });
 
 it('enforces app and install daily volume while duplicates consume no volume', function (): void {
+    useExplodingDefaultGuard();
     [, $appLimitedValue] = createIngestApp([
         'daily_event_cap' => 1,
         'install_daily_event_cap' => 10,
     ]);
     $appToken = registerInstall($appLimitedValue)['install_token'];
 
-    $this->withToken($appToken)->postJson('/api/ingest', ingestEnvelope([
+    $volumeResponse = $this->withToken($appToken)->postJson('/api/ingest', ingestEnvelope([
         ingestEvent(),
         ingestEvent('01ARZ3NDEKTSV4RRFFQ69G5FAW'),
-    ]))->assertTooManyRequests();
+    ]))->assertTooManyRequests()->assertHeader('Retry-After');
+    expect((int) $volumeResponse->headers->get('Retry-After'))->toBeGreaterThan(0)->toBeLessThanOrEqual(86_400);
     expect(StoredEvent::query()->count())->toBe(0);
 
     [, $installLimitedValue] = createIngestApp([
@@ -266,6 +307,28 @@ it('enforces app and install daily volume while duplicates consume no volume', f
     expect(StoredEvent::query()->count())->toBe(2);
 });
 
+it('fails closed without resolving a user when global protection configuration is invalid', function (): void {
+    useExplodingDefaultGuard();
+
+    foreach ([0, -1, 'invalid'] as $invalid) {
+        config([
+            'telltale.ingest.max_body_bytes' => $invalid,
+            'telltale.ingest.ip_rate_per_minute' => 240,
+        ]);
+
+        $this->postJson('/api/register', [])->assertServiceUnavailable();
+    }
+
+    foreach ([0, -1, 'invalid'] as $invalid) {
+        config([
+            'telltale.ingest.max_body_bytes' => 1_048_576,
+            'telltale.ingest.ip_rate_per_minute' => $invalid,
+        ]);
+
+        $this->postJson('/api/register', [])->assertServiceUnavailable();
+    }
+});
+
 it('persists no plaintext credentials or IP addresses', function (): void {
     [$app, $ingestValue] = createIngestApp();
     $token = registerInstall($ingestValue)['install_token'];
@@ -279,6 +342,23 @@ it('persists no plaintext credentials or IP addresses', function (): void {
         ->and(DB::getSchemaBuilder()->getColumnListing('apps'))->not->toContain('ip')
         ->and(DB::getSchemaBuilder()->getColumnListing('installs'))->not->toContain('ip')
         ->and(DB::getSchemaBuilder()->getColumnListing('events'))->not->toContain('ip');
+});
+
+it('masks credential hash bindings in PostgreSQL query exceptions', function (): void {
+    $credentialHash = str_repeat('a', 64);
+
+    try {
+        TrackedApp::query()
+            ->where('ingest_key_hash', $credentialHash)
+            ->whereRaw('missing_ingest_function()')
+            ->first();
+    } catch (QueryException $exception) {
+        expect($exception->getMessage())->not->toContain($credentialHash);
+
+        return;
+    }
+
+    $this->fail('The contained failing credential query did not throw.');
 });
 
 it('uses an irreversible IP cache key when the production database cache is used', function (): void {
@@ -318,4 +398,12 @@ it('uses row locks and database uniqueness as concurrent ingest safeguards', fun
         'props' => [],
         'client_version' => '1.2.3',
     ]))->toThrow(QueryException::class);
+});
+
+it('rejects an event whose install belongs to a different app', function (): void {
+    $event = StoredEvent::factory()->make();
+    $otherApp = TrackedApp::factory()->create();
+
+    expect(fn () => $event->forceFill(['app_id' => $otherApp->id])->save())
+        ->toThrow(QueryException::class);
 });

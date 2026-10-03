@@ -31,6 +31,7 @@ return new class extends Migration
             $table->timestampsTz();
 
             $table->unique(['app_id', 'install_uuid']);
+            $table->unique(['app_id', 'id']);
         });
 
         Schema::create('events', function (Blueprint $table): void {
@@ -48,6 +49,10 @@ return new class extends Migration
             $table->timestampsTz();
 
             $table->unique(['app_id', 'event_id']);
+            $table->foreign(['app_id', 'install_id'])
+                ->references(['app_id', 'id'])
+                ->on('installs')
+                ->cascadeOnDelete();
             $table->index(['app_id', 'created_at']);
             $table->index(['install_id', 'created_at']);
         });

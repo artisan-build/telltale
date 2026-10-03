@@ -54,6 +54,18 @@ it('stores configurable positive limits per app', function (): void {
         ->and($app->install_daily_event_cap)->toBe(20);
 });
 
+it('accepts app names at the storage boundary and rejects invalid names', function (): void {
+    $manager = resolve(AppManager::class);
+
+    expect($manager->create(str_repeat('a', AppManager::MAX_NAME_LENGTH))->app()->name)
+        ->toHaveLength(AppManager::MAX_NAME_LENGTH);
+
+    expect(fn () => $manager->create(str_repeat('a', AppManager::MAX_NAME_LENGTH + 1)))
+        ->toThrow(InvalidArgumentException::class)
+        ->and(fn () => $manager->create("invalid\0name"))
+        ->toThrow(InvalidArgumentException::class);
+});
+
 it('builds coherent app install and event fixtures', function (): void {
     $event = StoredEvent::factory()->create();
 

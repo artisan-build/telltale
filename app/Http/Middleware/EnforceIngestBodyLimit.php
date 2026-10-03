@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Exceptions\InvalidIngestConfiguration;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ final class EnforceIngestBodyLimit
         $maximum = config('telltale.ingest.max_body_bytes');
 
         if (! is_int($maximum) || $maximum < 1) {
-            return $next($request);
+            throw new InvalidIngestConfiguration;
         }
 
         $declaredLength = $request->server('CONTENT_LENGTH');

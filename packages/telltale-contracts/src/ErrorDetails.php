@@ -173,5 +173,9 @@ final readonly class ErrorDetails
         if (preg_match('//u', $value) !== 1) {
             throw new ContractException("{$field} must be valid UTF-8.");
         }
+
+        if (str_contains($value, "\0")) {
+            throw new ContractException("{$field} must not contain NUL bytes.");
+        }
     }
 }
