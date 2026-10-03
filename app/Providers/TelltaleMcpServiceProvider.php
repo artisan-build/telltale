@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Http\Middleware\RejectIngestCredentialsFromMcp;
+use App\Http\Middleware\RejectIngestCredentialsFromReadSurface;
 use App\Mcp\TelltaleMcpServer;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Mcp\Facades\Mcp;
@@ -27,12 +27,12 @@ final class TelltaleMcpServiceProvider extends ServiceProvider
         $this->app->booted(function (): void {
             Mcp::web('/mcp', TelltaleMcpServer::class)
                 ->middleware([
-                    RejectIngestCredentialsFromMcp::class,
+                    RejectIngestCredentialsFromReadSurface::class,
                     'bfc.mcp:product,read',
                 ]);
             Mcp::web('/mcp/destructive', TelltaleMcpServer::class)
                 ->middleware([
-                    RejectIngestCredentialsFromMcp::class,
+                    RejectIngestCredentialsFromReadSurface::class,
                     'bfc.mcp:product,destructive',
                 ]);
         });
