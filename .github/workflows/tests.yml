@@ -12,11 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  ci:
+  server:
+    name: server (8.5)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        php-version: ['8.4', '8.5']
 
     services:
       postgres:
@@ -42,17 +40,15 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
-          php-version: ${{ matrix.php-version }}
+          php-version: '8.5'
           tools: composer:v2
           coverage: none
 
       - name: Install root dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Install package dependencies
-        run: |
-          composer -d packages/telltale-contracts install --no-interaction --prefer-dist
-          composer -d packages/telltale-client install --no-interaction --prefer-dist
+      - name: Install contracts dependencies
+        run: composer -d packages/telltale-contracts install --no-interaction --prefer-dist
 
       - name: Prepare application environment
         run: |
@@ -65,16 +61,49 @@ jobs:
       - name: Run PHPStan
         run: composer stan
 
-      - name: Run package static analysis
-        run: composer packages:stan
+      - name: Run contracts static analysis
+        run: composer -d packages/telltale-contracts stan
 
       - name: Run root tests
         run: ./vendor/bin/pest
 
-      - name: Run package tests
-        run: composer packages:test
+      - name: Run contracts tests
+        run: composer -d packages/telltale-contracts test
 
       - name: Audit dependencies
         run: |
           composer audit --abandoned=report
-          composer packages:audit
+          composer -d packages/telltale-contracts audit --abandoned=report
+
+  client:
+    name: client (${{ matrix.php-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.4', '8.5']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Install client dependencies
+        run: composer -d packages/telltale-client install --no-interaction --prefer-dist
+
+      - name: Run client static analysis
+        run: composer -d packages/telltale-client stan
+
+      - name: Run client tests
+        run: composer -d packages/telltale-client test
+
+      - name: Audit client dependencies
+        run: composer -d packages/telltale-client audit --abandoned=report

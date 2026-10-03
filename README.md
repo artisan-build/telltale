@@ -56,8 +56,9 @@ composer packages:test
 composer packages:audit
 ```
 
-CI defines the required `ci (8.4)`, `ci (8.5)`, and `quality` check contexts. The test matrix uses
-PostgreSQL 16, not SQLite.
+CI defines the required `server (8.5)`, `client (8.4)`, `client (8.5)`, and `quality` check contexts.
+The server and contracts run on PHP 8.5 against PostgreSQL 16. The device-side client runs its
+standalone package checks on PHP 8.4 and 8.5 without PostgreSQL. Composer's PHP floor remains `^8.4`.
 
 ## Built For Cloud
 
