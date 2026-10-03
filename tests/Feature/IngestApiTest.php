@@ -167,6 +167,94 @@ it('accepts replay without duplicate rows and keeps dropped totals monotonic', f
         ->and(Install::query()->sole()->dropped_events_total)->toBe(8);
 });
 
+it('accepts client-format gzip envelopes and preserves plain JSON ingest', function (): void {
+    [, $ingestValue] = createIngestApp();
+    $token = registerInstall($ingestValue)['install_token'];
+    $gzipEnvelope = ingestEnvelope();
+    $json = json_encode($gzipEnvelope, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $compressed = gzencode($json);
+    expect($compressed)->toBeString();
+
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'CONTENT_LENGTH' => strlen($compressed),
+        'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        'HTTP_CONTENT_ENCODING' => 'gzip',
+    ], content: $compressed)->assertAccepted()->assertJson([
+        'accepted' => 1,
+        'duplicates' => 0,
+    ]);
+
+    $this->withToken($token)->postJson('/api/ingest', ingestEnvelope([
+        ingestEvent('01ARZ3NDEKTSV4RRFFQ69G5FAW'),
+    ]))->assertAccepted()->assertJson([
+        'accepted' => 1,
+        'duplicates' => 0,
+    ]);
+
+    expect(StoredEvent::query()->orderBy('id')->pluck('event_id')->all())->toBe([
+        '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+    ]);
+});
+
+it('rejects malformed gzip and unsupported encodings generically without resolving a user', function (): void {
+    useExplodingDefaultGuard();
+
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_CONTENT_ENCODING' => 'gzip',
+    ], content: 'not-gzip')->assertBadRequest()->assertExactJson([
+        'message' => 'The compressed request body is invalid.',
+    ]);
+
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_CONTENT_ENCODING' => 'br',
+    ], content: '{}')->assertStatus(415)->assertExactJson([
+        'message' => 'Content encoding is not supported.',
+    ]);
+});
+
+it('bounds both compressed and decoded gzip bodies before credential lookup', function (): void {
+    [, $ingestValue] = createIngestApp();
+    $token = registerInstall($ingestValue)['install_token'];
+    $json = json_encode(ingestEnvelope([
+        ingestEvent(overrides: ['props' => ['payload' => str_repeat('x', 4_000)]]),
+    ]), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $compressed = gzencode($json);
+    expect($compressed)->toBeString()
+        ->and(strlen($compressed))->toBeLessThan(512)
+        ->and(strlen($json))->toBeGreaterThan(512);
+
+    $queries = [];
+    DB::listen(function ($query) use (&$queries): void {
+        $queries[] = strtolower($query->sql);
+    });
+
+    config(['telltale.ingest.max_body_bytes' => strlen($compressed) - 1]);
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'CONTENT_LENGTH' => strlen($compressed),
+        'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        'HTTP_CONTENT_ENCODING' => 'gzip',
+    ], content: $compressed)->assertStatus(413)->assertExactJson([
+        'message' => 'Request body is too large.',
+    ]);
+
+    config(['telltale.ingest.max_body_bytes' => 512]);
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'CONTENT_LENGTH' => strlen($compressed),
+        'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        'HTTP_CONTENT_ENCODING' => 'gzip',
+    ], content: $compressed)->assertStatus(413)->assertExactJson([
+        'message' => 'Request body is too large.',
+    ]);
+
+    expect(collect($queries)->contains(fn (string $query): bool => str_contains($query, 'installs')))->toBeFalse();
+});
+
 it('rejects malformed and unsupported envelopes with actionable validation errors', function (): void {
     [, $ingestValue] = createIngestApp();
     $token = registerInstall($ingestValue)['install_token'];

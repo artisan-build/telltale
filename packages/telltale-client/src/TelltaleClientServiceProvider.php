@@ -13,6 +13,7 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Encryption\StringEncrypter;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\ServiceProvider;
+use Throwable;
 
 final class TelltaleClientServiceProvider extends ServiceProvider
 {
@@ -39,11 +40,17 @@ final class TelltaleClientServiceProvider extends ServiceProvider
             $this->app->make(Factory::class),
             $this->app->make(Repository::class),
         ));
-        $this->app->singleton(TelltaleClient::class, fn (): TelltaleClient => new TelltaleManager(
-            $this->app->make(ClientDatabase::class),
-            $this->app->make(DrainService::class),
-            $this->app->make(Repository::class),
-        ));
+        $this->app->singleton(TelltaleClient::class, function (): TelltaleClient {
+            try {
+                return new TelltaleManager(
+                    $this->app->make(ClientDatabase::class),
+                    $this->app->make(DrainService::class),
+                    $this->app->make(Repository::class),
+                );
+            } catch (Throwable) {
+                return new NullTelltaleClient;
+            }
+        });
     }
 
     public function boot(): void

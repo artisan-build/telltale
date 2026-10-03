@@ -25,7 +25,7 @@ final class ClientDatabase
         if ($path !== ':memory:') {
             $directory = dirname($path);
 
-            if (! is_dir($directory) && ! mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            if (! is_dir($directory) && ! @mkdir($directory, 0755, true) && ! is_dir($directory)) {
                 throw new RuntimeException('The Telltale storage directory could not be created.');
             }
         }

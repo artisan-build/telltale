@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ArtisanBuild\TelltaleClient\Contracts\TelltaleClient;
 use ArtisanBuild\TelltaleClient\Facades\Telltale;
 use ArtisanBuild\TelltaleClient\Jobs\DrainOutbox;
+use ArtisanBuild\TelltaleClient\NullTelltaleClient;
 use ArtisanBuild\TelltaleClient\TelltaleClientServiceProvider;
 use ArtisanBuild\TelltaleClient\Testing\TelltaleFake;
 
@@ -49,4 +50,25 @@ it('provides a database queue job and an explicit drain entry point', function (
         ->and(Telltale::drain()->successful)->toBeTrue();
 
     $job->handle($fake);
+});
+
+it('keeps every facade operation safe when local storage construction fails', function (): void {
+    $blockedParent = tempnam(sys_get_temp_dir(), 'telltale-blocked-');
+    expect($blockedParent)->toBeString();
+    config()->set('telltale.database', $blockedParent.'/telltale.sqlite');
+    Telltale::clearResolvedInstance(TelltaleClient::class);
+    app()->forgetInstance(TelltaleClient::class);
+
+    Telltale::event('safe');
+    Telltale::identify('opaque-user');
+    Telltale::optOut();
+    Telltale::optIn();
+    Telltale::beforeSend(fn (array $event): array => $event);
+    $result = Telltale::drain();
+
+    expect(app(TelltaleClient::class))->toBeInstanceOf(NullTelltaleClient::class)
+        ->and($result->successful)->toBeFalse()
+        ->and($result->retryAfterSeconds)->toBeNull();
+
+    unlink($blockedParent);
 });
