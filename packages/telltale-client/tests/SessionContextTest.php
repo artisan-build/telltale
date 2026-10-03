@@ -6,9 +6,17 @@ use ArtisanBuild\TelltaleClient\Contracts\TelltaleClient;
 use ArtisanBuild\TelltaleClient\Facades\Telltale;
 use ArtisanBuild\TelltaleClient\Storage\ClientDatabase;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Facade;
+use Native\Desktop\AppRoot;
 use Native\Desktop\Facades\App;
+use Native\Desktop\Facades\Process;
+use Native\Desktop\Facades\System;
+use Native\Desktop\ProcessRoot;
+use Native\Desktop\SystemRoot;
+use Native\Mobile\DeviceRoot;
 use Native\Mobile\Facades\Device;
 use Native\Mobile\Facades\Network;
+use Native\Mobile\NetworkRoot;
 
 it('persists sessions across restarts and rolls only after a gap strictly over the threshold', function (): void {
     require_once __DIR__.'/Fixtures/NativePhp.php';
@@ -54,10 +62,7 @@ it('captures allowlisted mobile context once per session and degrades when optio
     config()->set('telltale.capture.platform', 'mobile');
     config()->set('nativephp.version', '3.2.1');
     config()->set('nativephp.version_code', 321);
-    Device::$throws = false;
-    Device::$getInfoCalls = 0;
-    Device::$getIdCalls = 0;
-    Device::$info = json_encode([
+    $device = new DeviceRoot(json_encode([
         'name' => 'Private Phone Name',
         'model' => 'Phone Pro',
         'operatingSystem' => 'iOS',
@@ -65,15 +70,19 @@ it('captures allowlisted mobile context once per session and degrades when optio
         'language' => 'de-CH',
         'androidId' => 'forbidden-id',
         'identifierForVendor' => 'forbidden-idfv',
-    ], JSON_THROW_ON_ERROR);
-    Network::$throws = false;
-    Network::$status = (object) [
+    ], JSON_THROW_ON_ERROR));
+    Device::swap($device);
+    Network::swap(new NetworkRoot((object) [
         'connected' => true,
         'type' => 'wifi',
         'isExpensive' => false,
         'isConstrained' => true,
         'ip' => '192.0.2.2',
-    ];
+    ]));
+
+    expect(is_subclass_of(Device::class, Facade::class))->toBeTrue()
+        ->and(method_exists(Device::class, 'getInfo'))->toBeFalse()
+        ->and(is_callable([Device::class, 'getInfo']))->toBeTrue();
 
     Telltale::event('one');
     Telltale::event('two');
@@ -82,8 +91,8 @@ it('captures allowlisted mobile context once per session and degrades when optio
     $props = $contexts[0]['props'];
 
     expect($contexts)->toHaveCount(1)
-        ->and(Device::$getInfoCalls)->toBe(1)
-        ->and(Device::$getIdCalls)->toBe(0)
+        ->and($device->getInfoCalls)->toBe(1)
+        ->and($device->getIdCalls)->toBe(0)
         ->and($props)->toMatchArray([
             'platform' => 'mobile',
             'app_version' => '3.2.1',
@@ -98,9 +107,22 @@ it('captures allowlisted mobile context once per session and degrades when optio
         ->and($props)->not->toHaveKeys(['name', 'androidId', 'identifierForVendor', 'ip']);
 
     Telltale::endSession('test');
-    Device::$throws = true;
-    Network::$throws = true;
+    Device::swap(new DeviceRoot(throws: true));
+    Network::swap(new NetworkRoot(throws: true));
     Telltale::event('after-failure');
+    $events = array_map(static fn ($item): array => $item->event, app(ClientDatabase::class)->batch(100));
+    $latestContext = collect($events)->where('type', 'context')->last();
+
+    expect($latestContext['props'])->toBe([
+        'platform' => 'mobile',
+        'app_version' => '3.2.1',
+        'app_build' => 321,
+    ]);
+
+    Telltale::endSession('test');
+    Device::swap(new class {});
+    Network::swap(new class {});
+    Telltale::event('after-missing-api');
     $events = array_map(static fn ($item): array => $item->event, app(ClientDatabase::class)->batch(100));
     $latestContext = collect($events)->where('type', 'context')->last();
 
@@ -114,7 +136,13 @@ it('captures allowlisted mobile context once per session and degrades when optio
 it('captures allowlisted desktop context through the documented facade methods', function (): void {
     require_once __DIR__.'/Fixtures/NativePhp.php';
     config()->set('telltale.capture.platform', 'desktop');
-    App::$throws = false;
+    App::swap(new AppRoot);
+    Process::swap(new ProcessRoot);
+    System::swap(new SystemRoot);
+
+    expect(is_subclass_of(App::class, Facade::class))->toBeTrue()
+        ->and(method_exists(App::class, 'version'))->toBeFalse()
+        ->and(is_callable([App::class, 'version']))->toBeTrue();
 
     Telltale::event('desktop');
     $events = array_map(static fn ($item): array => $item->event, app(ClientDatabase::class)->batch(10));
@@ -128,4 +156,14 @@ it('captures allowlisted desktop context through the documented facade methods',
         'locale' => 'en-GB',
         'timezone' => 'Europe/London',
     ]);
+
+    Telltale::endSession('test');
+    App::swap(new AppRoot(throws: true));
+    Process::swap(new class {});
+    System::swap(new class {});
+    Telltale::event('desktop-degraded');
+    $events = array_map(static fn ($item): array => $item->event, app(ClientDatabase::class)->batch(20));
+    $context = collect($events)->where('type', 'context')->last();
+
+    expect($context['props'])->toBe(['platform' => 'desktop']);
 });

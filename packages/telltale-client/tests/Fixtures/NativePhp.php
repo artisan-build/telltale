@@ -3,54 +3,74 @@
 declare(strict_types=1);
 
 namespace Native\Mobile {
-    final class NativeServiceProvider {}
-}
-
-namespace Native\Mobile\Facades {
     use RuntimeException;
 
-    final class Device
+    final class NativeServiceProvider {}
+
+    final class DeviceRoot
     {
-        public static string $info = '{"model":"Phone","operatingSystem":"iOS","osVersion":"18.0","language":"en-US"}';
+        public int $getInfoCalls = 0;
 
-        public static bool $throws = false;
+        public int $getIdCalls = 0;
 
-        public static int $getInfoCalls = 0;
+        public function __construct(
+            public string $info = '{"model":"Phone","operatingSystem":"iOS","osVersion":"18.0","language":"en-US"}',
+            public bool $throws = false,
+        ) {}
 
-        public static int $getIdCalls = 0;
-
-        public static function getId(): string
+        public function getId(): string
         {
-            self::$getIdCalls++;
+            $this->getIdCalls++;
 
             return 'forbidden-device-id';
         }
 
-        public static function getInfo(): ?string
+        public function getInfo(): ?string
         {
-            self::$getInfoCalls++;
+            $this->getInfoCalls++;
 
-            if (self::$throws) {
+            if ($this->throws) {
                 throw new RuntimeException('device unavailable');
             }
 
-            return self::$info;
+            return $this->info;
         }
     }
 
-    final class Network
+    final class NetworkRoot
     {
-        public static ?object $status = null;
+        public function __construct(
+            public ?object $status = null,
+            public bool $throws = false,
+        ) {}
 
-        public static bool $throws = false;
-
-        public static function status(): ?object
+        public function status(): ?object
         {
-            if (self::$throws) {
+            if ($this->throws) {
                 throw new RuntimeException('network unavailable');
             }
 
-            return self::$status;
+            return $this->status;
+        }
+    }
+}
+
+namespace Native\Mobile\Facades {
+    use Illuminate\Support\Facades\Facade;
+
+    final class Device extends Facade
+    {
+        protected static function getFacadeAccessor(): string
+        {
+            return 'nativephp.mobile.device';
+        }
+    }
+
+    final class Network extends Facade
+    {
+        protected static function getFacadeAccessor(): string
+        {
+            return 'nativephp.mobile.network';
         }
     }
 }
@@ -73,62 +93,80 @@ namespace Native\Mobile\Events\App {
     }
 }
 
-namespace Native\Mobile\Events\Async {
-    final class AsyncTaskFailed
-    {
-        public function __construct(
-            public string $id,
-            public string $exceptionClass,
-            public string $message,
-            public ?string $trace = null,
-        ) {}
-    }
-}
-
 namespace Native\Desktop {
-    final class NativeServiceProvider {}
-}
-
-namespace Native\Desktop\Facades {
     use RuntimeException;
 
-    final class App
-    {
-        public static bool $throws = false;
+    final class NativeServiceProvider {}
 
-        public static function version(): string
+    final class AppRoot
+    {
+        public function __construct(public bool $throws = false) {}
+
+        public function version(): string
         {
-            if (self::$throws) {
+            if ($this->throws) {
                 throw new RuntimeException('app unavailable');
             }
 
             return '2.4.0';
         }
 
-        public static function getLocale(): string
+        public function getLocale(): string
         {
+            if ($this->throws) {
+                throw new RuntimeException('app unavailable');
+            }
+
             return 'en-GB';
         }
     }
 
-    final class Process
+    final class ProcessRoot
     {
-        public static function platform(): string
+        public function platform(): string
         {
             return 'darwin';
         }
 
-        public static function arch(): string
+        public function arch(): string
         {
             return 'arm64';
         }
     }
 
-    final class System
+    final class SystemRoot
     {
-        public static function timezone(): string
+        public function timezone(): string
         {
             return 'Europe/London';
+        }
+    }
+}
+
+namespace Native\Desktop\Facades {
+    use Illuminate\Support\Facades\Facade;
+
+    final class App extends Facade
+    {
+        protected static function getFacadeAccessor(): string
+        {
+            return 'nativephp.desktop.app';
+        }
+    }
+
+    final class Process extends Facade
+    {
+        protected static function getFacadeAccessor(): string
+        {
+            return 'nativephp.desktop.process';
+        }
+    }
+
+    final class System extends Facade
+    {
+        protected static function getFacadeAccessor(): string
+        {
+            return 'nativephp.desktop.system';
         }
     }
 }
@@ -151,8 +189,28 @@ namespace Native\Desktop\Events\PowerMonitor {
 namespace Native\Desktop\Events\AutoUpdater {
     class UpdateAvailable
     {
-        public function __construct(public string $version) {}
+        public function __construct(
+            public string $version,
+            public array $files,
+            public string $releaseDate,
+            public ?string $releaseName = null,
+            public string|array|null $releaseNotes = null,
+            public ?int $stagingPercentage = null,
+            public ?string $minimumSystemVersion = null,
+        ) {}
     }
 
-    class UpdateDownloaded extends UpdateAvailable {}
+    class UpdateDownloaded
+    {
+        public function __construct(
+            public string $downloadedFile,
+            public string $version,
+            public array $files,
+            public string $releaseDate,
+            public ?string $releaseName = null,
+            public string|array|null $releaseNotes = null,
+            public ?int $stagingPercentage = null,
+            public ?string $minimumSystemVersion = null,
+        ) {}
+    }
 }

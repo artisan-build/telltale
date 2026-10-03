@@ -25,11 +25,11 @@ use Native\Desktop\Events\PowerMonitor\UserDidResignActive;
 use Native\Desktop\Events\Windows\WindowBlurred;
 use Native\Desktop\Events\Windows\WindowFocused;
 use Native\Mobile\Events\App\UpdateInstalled;
-use Native\Mobile\Events\Async\AsyncTaskFailed;
 use Native\Mobile\Events\Screen\ScreenMounted;
 use Native\Mobile\Events\Screen\ScreenResumed;
 use Native\Mobile\Events\Screen\ScreenUnmounted;
 use Native\Mobile\Facades\Network;
+use Native\Mobile\NetworkRoot;
 
 it('registers safely when neither optional NativePHP runtime is installed', function (): void {
     $capture = new AutoCapture(
@@ -49,13 +49,13 @@ it('maps the authoritative mobile and desktop signals into local contract events
     config()->set('nativephp.version', '1.7.0');
     config()->set('nativephp.version_code', 42);
     config()->set('telltale.capture.platform', 'mobile');
-    Network::$status = (object) [
+    Network::swap(new NetworkRoot((object) [
         'connected' => true,
         'type' => 'wifi',
         'isExpensive' => false,
         'isConstrained' => false,
         'address' => '192.0.2.1',
-    ];
+    ]));
 
     $handler = new class
     {
@@ -84,12 +84,6 @@ it('maps the authoritative mobile and desktop signals into local contract events
     $events->dispatch(new ScreenResumed('App\\Screens\\Home', '/home'));
     $events->dispatch(new ScreenUnmounted('App\\Screens\\Home', '/home'));
     $events->dispatch(new UpdateInstalled('1.8.0', time()));
-    $events->dispatch(new AsyncTaskFailed(
-        'task-id',
-        RuntimeException::class,
-        'Failed for person@example.test',
-        '#0 /private/path/Worker.php(20): run()',
-    ));
 
     $job = Mockery::mock(Job::class);
     $job->shouldReceive('resolveName')->once()->andReturn('App\\Jobs\\SyncData');
@@ -100,8 +94,8 @@ it('maps the authoritative mobile and desktop signals into local contract events
     $events->dispatch(new WindowBlurred('main'));
     $events->dispatch(new UserDidBecomeActive);
     $events->dispatch(new UserDidResignActive);
-    $events->dispatch(new UpdateAvailable('2.5.0'));
-    $events->dispatch(new UpdateDownloaded('2.5.0'));
+    $events->dispatch(new UpdateAvailable('2.5.0', [], '2026-10-03', 'Telltale 2.5'));
+    $events->dispatch(new UpdateDownloaded('/tmp/telltale.zip', '2.5.0', [], '2026-10-03', 'Telltale 2.5'));
 
     $request = Request::create('/orders/123');
     $request->setRouteResolver(function (): Route {
@@ -110,7 +104,7 @@ it('maps the authoritative mobile and desktop signals into local contract events
 
         return $route;
     });
-    $events->dispatch(new RequestHandled($request, new Response('ok')));
+    $events->dispatch(new RequestHandled($request, new Response('ok', 200, ['Content-Type' => 'text/html'])));
 
     $events = array_column(app(ClientDatabase::class)->batch(100), 'event');
     $byName = [];
@@ -121,7 +115,7 @@ it('maps the authoritative mobile and desktop signals into local contract events
     expect($byName['/home'])->toHaveCount(3)
         ->and(array_column($byName['/home'], 'type'))->each->toBe('screen')
         ->and($byName['app_update_installed'][0]['props']['version'])->toBe('1.8.0')
-        ->and($byName[RuntimeException::class])->toHaveCount(3)
+        ->and($byName[RuntimeException::class])->toHaveCount(2)
         ->and($byName[RuntimeException::class][0]['error']['message'])->not->toContain('person@example.test')
         ->and(collect($byName[RuntimeException::class])->pluck('props.source'))->toContain('laravel')
         ->and($byName['window:main'])->toHaveCount(2)
@@ -134,6 +128,45 @@ it('maps the authoritative mobile and desktop signals into local contract events
     foreach ($events as $captured) {
         expect(fn () => Event::fromArray($captured))->not->toThrow(Throwable::class);
     }
+});
+
+it('captures only distinct desktop GET navigations', function (): void {
+    require_once __DIR__.'/Fixtures/NativePhp.php';
+
+    $container = new Container;
+    $container->instance(TelltaleClient::class, app(TelltaleClient::class));
+    $events = new EventDispatcher($container);
+    (new AutoCapture($events, $container))->register();
+
+    $navigate = function (string $method, string $path, string $name, string $contentType = 'text/html') use ($events): void {
+        $request = Request::create($path, $method, server: ['HTTP_ACCEPT' => 'text/html']);
+        $request->setRouteResolver(function () use ($method, $path, $name): Route {
+            $route = new Route($method, ltrim($path, '/'), fn (): string => 'ok');
+            $route->name($name);
+
+            return $route;
+        });
+        $events->dispatch(new RequestHandled($request, new Response('ok', 200, ['Content-Type' => $contentType])));
+    };
+
+    $navigate('GET', '/home', 'home');
+    $navigate('GET', '/home', 'home');
+    $navigate('POST', '/livewire/update', 'livewire.update');
+    $navigate('GET', '/api/profile', 'api.profile', 'application/json');
+    $navigate('GET', '/_native/status', 'nativephp.status');
+    $navigate('GET', '/build/app.js', 'assets.app', 'application/javascript');
+    $navigate('GET', '/health', 'health', 'text/plain');
+    $navigate('GET', '/settings', 'settings');
+    $navigate('GET', '/home', 'home');
+
+    $screens = collect(app(ClientDatabase::class)->batch(100))
+        ->pluck('event')
+        ->filter(fn (array $event): bool => ($event['props']['signal'] ?? null) === 'route_changed')
+        ->pluck('name')
+        ->values()
+        ->all();
+
+    expect($screens)->toBe(['home', 'settings', 'home']);
 });
 
 it('registers the desktop scheduler drain primitive without requiring host code', function (): void {

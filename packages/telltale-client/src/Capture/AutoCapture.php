@@ -17,6 +17,8 @@ final class AutoCapture
 {
     private Closure $classExists;
 
+    private ?string $lastDesktopScreen = null;
+
     public function __construct(
         private readonly Dispatcher $events,
         private readonly Container $container,
@@ -94,18 +96,6 @@ final class AutoCapture
             });
         }
 
-        $asyncFailed = 'Native\\Mobile\\Events\\Async\\AsyncTaskFailed';
-        if (($this->classExists)($asyncFailed)) {
-            $this->events->listen($asyncFailed, function (object $event): void {
-                $this->safe(fn (TelltaleClient $client) => $client->reportRemote(
-                    class: is_string($event->exceptionClass ?? null) ? $event->exceptionClass : 'Throwable',
-                    message: is_string($event->message ?? null) ? $event->message : '',
-                    trace: is_string($event->trace ?? null) ? $event->trace : null,
-                    source: 'mobile_async_task',
-                ));
-            });
-        }
-
         $this->events->listen('Illuminate\\Queue\\Events\\JobFailed', function (object $event): void {
             $this->safe(function (TelltaleClient $client) use ($event): void {
                 $exception = $event->exception ?? null;
@@ -179,20 +169,68 @@ final class AutoCapture
 
         $this->events->listen('Illuminate\\Foundation\\Http\\Events\\RequestHandled', function (object $event): void {
             $this->safe(function (TelltaleClient $client) use ($event): void {
-                $request = $event->request ?? null;
+                $screen = $this->desktopScreen($event);
 
-                if (! is_object($request) || ! method_exists($request, 'route') || ! method_exists($request, 'path')) {
+                if ($screen === null || $screen === $this->lastDesktopScreen) {
                     return;
                 }
 
-                $route = $request->route();
-                $name = is_object($route) && method_exists($route, 'getName') ? $route->getName() : null;
-                $path = '/'.ltrim((string) $request->path(), '/');
-                $path = preg_replace('/\/(?:\d+|[0-9a-f]{8}-[0-9a-f-]{27,})(?=\/|$)/i', '/{id}', $path) ?? $path;
-                $screen = is_string($name) && $name !== '' ? $name : $path;
                 $client->capture($screen, EventType::Screen, ['signal' => 'route_changed']);
+                $this->lastDesktopScreen = $screen;
             });
         });
+    }
+
+    private function desktopScreen(object $event): ?string
+    {
+        $request = $event->request ?? null;
+
+        if (! is_object($request)
+            || ! method_exists($request, 'isMethod')
+            || ! $request->isMethod('GET')
+            || ! method_exists($request, 'route')
+            || ! method_exists($request, 'path')) {
+            return null;
+        }
+
+        $route = $request->route();
+        $name = is_object($route) && method_exists($route, 'getName') ? $route->getName() : null;
+        $routeName = is_string($name) ? strtolower($name) : '';
+        $path = ltrim((string) $request->path(), '/');
+        $normalizedPath = strtolower($path);
+
+        foreach (['api.', 'livewire.', 'nativephp.', 'ignition.', 'debugbar.'] as $prefix) {
+            if (str_starts_with($routeName, $prefix)) {
+                return null;
+            }
+        }
+
+        foreach (['api/', 'livewire/', 'nativephp/', '_'] as $prefix) {
+            if (str_starts_with($normalizedPath, $prefix)) {
+                return null;
+            }
+        }
+
+        if (preg_match('/\.(?:css|js|mjs|map|json|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot)$/i', $path) === 1) {
+            return null;
+        }
+
+        $response = $event->response ?? null;
+        $contentType = is_object($response)
+            && isset($response->headers)
+            && is_object($response->headers)
+            && method_exists($response->headers, 'get')
+                ? $response->headers->get('Content-Type')
+                : null;
+
+        if (is_string($contentType) && ! str_starts_with(strtolower($contentType), 'text/html')) {
+            return null;
+        }
+
+        $path = '/'.$path;
+        $path = preg_replace('/\/(?:\d+|[0-9a-f]{8}-[0-9a-f-]{27,})(?=\/|$)/i', '/{id}', $path) ?? $path;
+
+        return $routeName !== '' ? (string) $name : $path;
     }
 
     private function registerExceptions(): void

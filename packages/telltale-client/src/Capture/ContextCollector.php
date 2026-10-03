@@ -97,7 +97,7 @@ final class ContextCollector
 
     private function call(string $class, string $method): mixed
     {
-        if (! class_exists($class) || ! method_exists($class, $method)) {
+        if (! class_exists($class) || ! is_callable([$class, $method])) {
             return null;
         }
 
