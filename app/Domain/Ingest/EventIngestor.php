@@ -11,12 +11,15 @@ use App\Models\StoredEvent;
 use App\Models\TrackedApp;
 use ArtisanBuild\TelltaleContracts\EnvelopeV1;
 use ArtisanBuild\TelltaleContracts\Event;
+use ArtisanBuild\TelltaleContracts\EventType;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 
 final class EventIngestor
 {
+    public function __construct(private readonly EventProjector $projector) {}
+
     public function ingest(Install $install, string $token, EnvelopeV1 $envelope): IngestResult
     {
         return DB::transaction(function () use ($install, $token, $envelope): IngestResult {
@@ -44,6 +47,15 @@ final class EventIngestor
                 unset($uniqueEvents[$eventId]);
             }
 
+            /** @var array<string, array<string, mixed>> $sessionContexts */
+            $sessionContexts = [];
+
+            foreach ($uniqueEvents as $event) {
+                if ($event->type === EventType::Context) {
+                    $sessionContexts[$event->sessionId] = $event->props;
+                }
+            }
+
             $newCount = count($uniqueEvents);
             $now = Date::now('UTC');
             $dayStart = $now->startOfDay();
@@ -66,7 +78,7 @@ final class EventIngestor
             }
 
             foreach ($uniqueEvents as $event) {
-                StoredEvent::query()->create([
+                $stored = StoredEvent::query()->create([
                     'app_id' => $app->id,
                     'install_id' => $lockedInstall->id,
                     'event_id' => $event->eventId,
@@ -78,6 +90,7 @@ final class EventIngestor
                     'error' => $event->error?->toArray(),
                     'client_version' => $envelope->clientVersion,
                 ]);
+                $this->projector->project($stored, $event, $lockedInstall, $sessionContexts[$event->sessionId] ?? null);
             }
 
             $droppedEventsTotal = max($lockedInstall->dropped_events_total, $envelope->droppedEventsTotal);
