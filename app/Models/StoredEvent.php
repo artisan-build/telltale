@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $event_id
  * @property string $name
  * @property string $type
+ *
+ * @mixin IdeHelperStoredEvent
  */
 final class StoredEvent extends Model
 {

@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $dropped_events_total
  * @property CarbonImmutable|null $revoked_at
  * @property-read TrackedApp $app
+ *
+ * @mixin IdeHelperInstall
  */
 final class Install extends Model
 {

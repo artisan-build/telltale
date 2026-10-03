@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $install_rate_per_minute
  * @property int $daily_event_cap
  * @property int $install_daily_event_cap
+ *
+ * @mixin IdeHelperTrackedApp
  */
 final class TrackedApp extends Model
 {
