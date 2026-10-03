@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\TelltaleDashboard;
+
 return [
     'manifest' => [
         'name' => 'Telltale',
         'slug' => 'telltale',
-        'description' => 'Self-hosted product analytics and error reporting for NativePHP apps.',
+        'description' => 'Self-hosted NativePHP product analytics and PHP error reporting. Native crashes are not captured in v1.',
         'icon' => 'https://scalpels.app/img/products/transparent/telltale.png',
         'product_url' => 'https://scalpels.app/products/telltale',
     ],
@@ -18,8 +20,10 @@ return [
         'app_purposes' => [],
     ],
 
+    'dashboard' => TelltaleDashboard::class,
+
     'ui' => [
-        'landing_page' => false,
+        'landing_page' => true,
         'member_management' => false,
         'personal_credentials' => false,
         'installation_credentials' => false,

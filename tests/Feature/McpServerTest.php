@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Authorization\TelltaleAbility;
 use App\Domain\Ingest\AppManager;
 use App\Domain\Ingest\Credential as IngestCredential;
-use App\Http\Middleware\RejectIngestCredentialsFromMcp;
+use App\Http\Middleware\RejectIngestCredentialsFromReadSurface;
 use App\Mcp\TelltaleMcpServer;
 use App\Mcp\Tools\ActiveUsers;
 use App\Mcp\Tools\Apps;
@@ -77,7 +77,7 @@ it('registers exactly two effect-scoped MCP doors and publishes delegated metada
             ReorderJsonAccept::class,
             ValidateMcpHeaders::class,
             AddWwwAuthenticateHeader::class,
-            RejectIngestCredentialsFromMcp::class,
+            RejectIngestCredentialsFromReadSurface::class,
             'bfc.mcp:product,read',
         ])
         ->and($destructive)->not->toBeNull()
@@ -85,7 +85,7 @@ it('registers exactly two effect-scoped MCP doors and publishes delegated metada
             ReorderJsonAccept::class,
             ValidateMcpHeaders::class,
             AddWwwAuthenticateHeader::class,
-            RejectIngestCredentialsFromMcp::class,
+            RejectIngestCredentialsFromReadSurface::class,
             'bfc.mcp:product,destructive',
         ])
         ->and(config('built-for-cloud.mcp.path'))->toBe('/mcp')

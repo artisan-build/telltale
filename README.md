@@ -2,11 +2,11 @@
 
 Telltale is a pre-launch, self-hosted product analytics and error-reporting system for NativePHP
 desktop and mobile apps. Its server runs in the developer's Laravel Cloud account, while a small
-client package will capture device-side events for MCP-first analysis.
+client package captures device-side events for MCP-first analysis.
 
-> **Status: pre-launch scaffold.** This repository currently contains the Laravel server shell,
-> package boundaries, and quality/release tooling. Event capture, registration, ingest, storage,
-> aggregation, MCP tools, and product UI have not shipped yet.
+> **Status: pre-launch MVP.** The contracts, device client, ingest and storage server, MCP tools, and
+> standard Built for Cloud package UI are implemented. Native crash reporting remains out of scope for
+> v1.
 
 ## Repository Layout
 
@@ -22,6 +22,17 @@ read-only mirrors for lockstep releases.
 Telltale v1 will support events, screen views, estimated sessions, release adoption, product
 analytics, and the PHP error paths exposed by NativePHP. Native crashes, OOM failures, ANRs,
 background mobile uploads, session replay, feature flags, and a chart dashboard are not part of v1.
+
+## Documentation
+
+- [Setup](docs/setup.md) - generated from the same source as the package setup page and Scalpels handoff.
+- [Privacy declarations](docs/privacy.md) - Apple manifest, App Store label, and Google Play answers.
+- [Platform data reference](docs/data-reference.md) - exact capture, trace-header, and v1 limits.
+- [Scalpels post-provision handoff](docs/scalpels-handoff.md) - deterministic integration copy with no
+  client-wiring automation.
+
+Regenerate the setup artifacts with `php artisan telltale:generate-docs --local` and check drift with
+`php artisan telltale:generate-docs --local --check`.
 
 ## Local Development
 
