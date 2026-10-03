@@ -123,7 +123,7 @@ final class EventProjector
     }
 
     /**
-     * @param  array{app_version: string, platform: string, os: string}  $dimensions
+     * @param  array{app_version: string, platform: string, os: string, locale: string}  $dimensions
      */
     private function projectError(StoredEvent $stored, Event $event, array $dimensions): ?int
     {
@@ -211,7 +211,7 @@ final class EventProjector
     }
 
     /**
-     * @param  array{app_version: string, platform: string, os: string}  $dimensions
+     * @param  array{app_version: string, platform: string, os: string, locale: string}  $dimensions
      */
     private function projectDailyAggregates(StoredEvent $stored, Event $event, array $dimensions): void
     {
@@ -220,10 +220,15 @@ final class EventProjector
             AggregateDimension::Version->value => $dimensions['app_version'],
             AggregateDimension::Platform->value => $dimensions['platform'],
             AggregateDimension::OperatingSystem->value => $dimensions['os'],
+            AggregateDimension::Locale->value => $dimensions['locale'],
         ];
 
         if ($event->type === EventType::Screen) {
             $values[AggregateDimension::Screen->value] = $event->name;
+            $values[AggregateDimension::ScreenVersion->value] = $dimensions['app_version'];
+            $values[AggregateDimension::ScreenPlatform->value] = $dimensions['platform'];
+            $values[AggregateDimension::ScreenOperatingSystem->value] = $dimensions['os'];
+            $values[AggregateDimension::ScreenLocale->value] = $dimensions['locale'];
         }
 
         foreach ($values as $dimension => $value) {
@@ -246,7 +251,7 @@ final class EventProjector
     }
 
     /**
-     * @param  array{app_version: string, platform: string, os: string}  $dimensions
+     * @param  array{app_version: string, platform: string, os: string, locale: string}  $dimensions
      */
     private function projectInstallActivity(StoredEvent $stored, Install $install, array $dimensions): void
     {
@@ -286,7 +291,7 @@ final class EventProjector
 
     /**
      * @param  array<string, mixed>  $context
-     * @return array{app_version: string, platform: string, os: string}
+     * @return array{app_version: string, platform: string, os: string, locale: string}
      */
     private function dimensions(array $context): array
     {
@@ -294,6 +299,7 @@ final class EventProjector
             'app_version' => $this->dimensionValue($context['app_version'] ?? null),
             'platform' => $this->dimensionValue($context['platform'] ?? null),
             'os' => $this->dimensionValue($context['os'] ?? $context['platform_name'] ?? null),
+            'locale' => $this->dimensionValue($context['locale'] ?? $context['language'] ?? null),
         ];
     }
 

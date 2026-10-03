@@ -12,7 +12,10 @@ use Illuminate\Http\Request;
 
 final readonly class IngestRequestLimiter
 {
-    public function __construct(private RateLimiter $limiter) {}
+    public function __construct(
+        private RateLimiter $limiter,
+        private IngestHealthRecorder $health,
+    ) {}
 
     public function consumeIp(Request $request): void
     {
@@ -27,7 +30,7 @@ final readonly class IngestRequestLimiter
 
     public function consumeApp(TrackedApp $app): void
     {
-        $this->consume('telltale:app:'.$app->id, $app->rate_per_minute);
+        $this->consume('telltale:app:'.$app->id, $app->rate_per_minute, $app);
     }
 
     public function consumeInstall(TrackedApp $app, string $identifier): void
@@ -35,14 +38,19 @@ final readonly class IngestRequestLimiter
         $this->consume(
             'telltale:install:'.$app->id.':'.$this->opaque($identifier),
             $app->install_rate_per_minute,
+            $app,
         );
     }
 
-    private function consume(string $key, int $maximum): void
+    private function consume(string $key, int $maximum, ?TrackedApp $app = null): void
     {
         $attempts = $this->limiter->hit($key, 60);
 
         if ($attempts > $maximum) {
+            if ($app instanceof TrackedApp) {
+                $this->health->rateLimit($app);
+            }
+
             throw new IngestRateExceeded(max(1, $this->limiter->availableIn($key)));
         }
     }

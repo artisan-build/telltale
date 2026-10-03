@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domain\Ingest\CredentialAuthenticator;
+use App\Domain\Ingest\IngestHealthRecorder;
 use App\Domain\Ingest\IngestRequestLimiter;
 use App\Domain\Ingest\InstallRegistrar;
 use App\Exceptions\InvalidIngestCredential;
@@ -20,6 +21,7 @@ final class RegisterController extends Controller
         Request $request,
         CredentialAuthenticator $authenticator,
         IngestRequestLimiter $limiter,
+        IngestHealthRecorder $health,
         InstallRegistrar $registrar,
     ): JsonResponse {
         $ingestValue = (string) $request->header('X-Telltale-Ingest', '');
@@ -34,10 +36,14 @@ final class RegisterController extends Controller
         try {
             $decoded = json_decode($request->getContent(), flags: JSON_THROW_ON_ERROR);
         } catch (JsonException) {
+            $health->rejection($app);
+
             return response()->json(['message' => 'The registration payload is not valid JSON.'], 422);
         }
 
         if (! $decoded instanceof stdClass) {
+            $health->rejection($app);
+
             return response()->json(['message' => 'The registration payload must be a JSON object.'], 422);
         }
 
@@ -46,6 +52,8 @@ final class RegisterController extends Controller
         ]);
 
         if ($validator->fails()) {
+            $health->rejection($app);
+
             return response()->json([
                 'message' => 'The registration payload is invalid.',
                 'errors' => $validator->errors(),
@@ -55,6 +63,8 @@ final class RegisterController extends Controller
         $installUuid = $validator->validated()['install_id'];
 
         if (! is_string($installUuid)) {
+            $health->rejection($app);
+
             return response()->json(['message' => 'The registration payload is invalid.'], 422);
         }
 
@@ -63,6 +73,8 @@ final class RegisterController extends Controller
         try {
             $registration = $registrar->register($app, $ingestValue, $installUuid);
         } catch (InvalidIngestCredential) {
+            $health->rejection($app);
+
             return $this->invalidCredential();
         }
 

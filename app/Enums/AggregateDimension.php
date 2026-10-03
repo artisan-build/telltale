@@ -11,4 +11,9 @@ enum AggregateDimension: string
     case Version = 'version';
     case Platform = 'platform';
     case OperatingSystem = 'os';
+    case Locale = 'locale';
+    case ScreenVersion = 'screen_version';
+    case ScreenPlatform = 'screen_platform';
+    case ScreenOperatingSystem = 'screen_os';
+    case ScreenLocale = 'screen_locale';
 }

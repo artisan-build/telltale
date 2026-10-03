@@ -170,6 +170,31 @@ namespace App\Models{
 
 namespace App\Models{
 /**
+ * @property int $app_id
+ * @property string $health_date
+ * @property int $rejection_count
+ * @property int $rate_limit_count
+ * @property int $id
+ * @property \Carbon\CarbonImmutable|null $created_at
+ * @property \Carbon\CarbonImmutable|null $updated_at
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily whereAppId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily whereHealthDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily whereRateLimitCount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily whereRejectionCount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|IngestHealthDaily whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
+	#[\AllowDynamicProperties]
+	final class IdeHelperIngestHealthDaily {}
+}
+
+namespace App\Models{
+/**
  * @property int $id
  * @property int $app_id
  * @property string $install_uuid
