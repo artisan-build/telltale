@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $occurrence_count
  * @property array<string, mixed> $sample_error
  * @property array<string, string> $sample_context
+ *
+ * @mixin IdeHelperErrorGroupInstall
  */
 final class ErrorGroupInstall extends Model
 {

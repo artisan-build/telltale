@@ -55,7 +55,7 @@ it('prunes expired raw events and deletes only the selected app install without 
     ];
 
     expect(Artisan::call('telltale:prune-events', ['--days' => 90]))->toBe(0)
-        ->and(StoredEvent::query()->where('install_id', $firstInstall->id)->orderBy('occurred_at')->pluck('name')->all())->toBe([
+        ->and(StoredEvent::query()->where('install_id', $firstInstall->id)->oldest('occurred_at')->pluck('name')->all())->toBe([
             'current',
             'session.context',
             'error.reported',

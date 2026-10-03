@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $app_version
  * @property string $platform
  * @property string $os
+ *
+ * @mixin IdeHelperDailyActiveInstall
  */
 final class DailyActiveInstall extends Model
 {

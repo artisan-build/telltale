@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $installs_affected
  * @property array<string, mixed> $sample_error
  * @property array<string, string> $sample_context
+ *
+ * @mixin IdeHelperErrorGroup
  */
 final class ErrorGroup extends Model
 {

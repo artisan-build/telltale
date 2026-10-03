@@ -18,7 +18,7 @@ use ArtisanBuild\TelltaleContracts\EventType;
 
 final class EventProjector
 {
-    private const UNKNOWN = '<unknown>';
+    private const string UNKNOWN = '<unknown>';
 
     /**
      * @param  array<string, mixed>|null  $sessionContext
@@ -62,13 +62,13 @@ final class EventProjector
             ->where('app_id', $event->app_id)
             ->where('install_id', $event->install_id)
             ->where('started_at', '<=', $occurredAt)
-            ->orderByDesc('ended_at')
+            ->latest('ended_at')
             ->first();
         $next = TrackedSession::query()
             ->where('app_id', $event->app_id)
             ->where('install_id', $event->install_id)
             ->where('started_at', '>', $occurredAt)
-            ->orderBy('started_at')
+            ->oldest('started_at')
             ->first();
 
         $inactivityMinutes = config('telltale.storage.session_inactivity_minutes', 30);

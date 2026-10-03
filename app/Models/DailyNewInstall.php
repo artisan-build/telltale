@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $install_id
  * @property string $first_seen_on
  * @property string $app_version
+ *
+ * @mixin IdeHelperDailyNewInstall
  */
 final class DailyNewInstall extends Model
 {

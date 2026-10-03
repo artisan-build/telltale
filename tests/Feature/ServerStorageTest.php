@@ -33,7 +33,7 @@ it('uses the strict inactivity boundary and projects a replay exactly once', fun
         ->assertAccepted()
         ->assertJson(['accepted' => 0, 'duplicates' => 3]);
 
-    expect(TrackedSession::query()->orderBy('started_at')->pluck('event_count')->all())->toBe([2, 1])
+    expect(TrackedSession::query()->oldest('started_at')->pluck('event_count')->all())->toBe([2, 1])
         ->and(StoredEvent::query()->count())->toBe(3)
         ->and(StoredEvent::query()->whereNull('server_session_id')->count())->toBe(0)
         ->and((int) DailyAggregate::query()->where('dimension', AggregateDimension::EventName)->sum('event_count'))->toBe(3)

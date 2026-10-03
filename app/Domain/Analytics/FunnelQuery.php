@@ -31,7 +31,7 @@ final class FunnelQuery
             ->where('occurred_at', '>=', $from)
             ->where('occurred_at', '<=', $to)
             ->orderBy('install_id')
-            ->orderBy('occurred_at')
+            ->oldest('occurred_at')
             ->orderBy('id')
             ->get()
             ->groupBy('install_id');

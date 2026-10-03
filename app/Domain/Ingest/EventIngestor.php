@@ -16,9 +16,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 
-final class EventIngestor
+final readonly class EventIngestor
 {
-    public function __construct(private readonly EventProjector $projector) {}
+    public function __construct(private EventProjector $projector) {}
 
     public function ingest(Install $install, string $token, EnvelopeV1 $envelope): IngestResult
     {

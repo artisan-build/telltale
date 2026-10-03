@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $dimension_key
  * @property string $dimension_value
  * @property int $event_count
+ *
+ * @mixin IdeHelperDailyAggregate
  */
 final class DailyAggregate extends Model
 {

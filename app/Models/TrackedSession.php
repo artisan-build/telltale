@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable $ended_at
  * @property int $event_count
  * @property int $screen_count
+ *
+ * @mixin IdeHelperTrackedSession
  */
 final class TrackedSession extends Model
 {
