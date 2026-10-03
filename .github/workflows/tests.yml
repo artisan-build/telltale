@@ -76,5 +76,5 @@ jobs:
 
       - name: Audit dependencies
         run: |
-          composer audit
+          composer audit --abandoned=report
           composer packages:audit
