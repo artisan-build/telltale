@@ -39,9 +39,10 @@ handoff.
 ## CI
 
 - status: defined; the coordinator verifies it on the pull request.
-- exact required contexts: `ci (8.4)`, `ci (8.5)`, and `quality`.
-- `.github/workflows/tests.yml`: root Rector, root PHPStan/Larastan, root Pest, both package
-  static-analysis and Pest suites, and Composer audits on PHP 8.4 and 8.5 against PostgreSQL 16.
+- exact required contexts: `server (8.5)`, `client (8.4)`, `client (8.5)`, and `quality`.
+- `.github/workflows/tests.yml`: the `server (8.5)` job runs root and contracts checks on PHP
+  8.5 against PostgreSQL 16; standalone client jobs run client static analysis, Pest, and audit on
+  PHP 8.4 and 8.5 without PostgreSQL.
 - `.github/workflows/lint.yml`: root and package Pint checks on PHP 8.5.
 - both workflows target pushes and pull requests to `main`.
 
@@ -54,8 +55,8 @@ literal strings.
 - contracts: `composer -d packages/telltale-contracts install --no-interaction --prefer-dist`
 - client: `composer -d packages/telltale-client install --no-interaction --prefer-dist`
 - local post-install: copy `.env.example` to `.env`, run `php artisan key:generate`, and migrate.
-- PostgreSQL prerequisites: local databases `telltale` and `telltale_app_test`; CI creates
-  `telltale_app_test` through its PostgreSQL 16 service.
+- PostgreSQL prerequisites: local databases `telltale` and `telltale_app_test`; the server CI job
+  creates `telltale_app_test` through its PostgreSQL 16 service. Client CI jobs do not use PostgreSQL.
 - tests use the real `telltale_app_test` PostgreSQL database configured in `phpunit.xml`, never
   SQLite.
 
@@ -85,7 +86,8 @@ literal strings.
 
 ## Stack Notes
 
-- Laravel 13, Livewire 4, Flux 2, and PHP 8.4 or newer.
+- Laravel 13, Livewire 4, Flux 2, and a Composer PHP floor of `^8.4`.
+- Server and contracts CI runs on PHP 8.5. Client CI additionally covers device PHP 8.4.
 - Nodeless by design: no Node, npm, Vite, or frontend build step.
 - Tailwind is served from `public/build/assets/app.css`; regenerate it only with
   `php artisan tailwind:optimize` and commit the output.
