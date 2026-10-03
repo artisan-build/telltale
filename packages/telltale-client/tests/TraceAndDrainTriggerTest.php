@@ -5,9 +5,12 @@ declare(strict_types=1);
 use ArtisanBuild\TelltaleClient\Facades\Telltale;
 use ArtisanBuild\TelltaleClient\Http\TraceHeaderMiddleware;
 use ArtisanBuild\TelltaleClient\Jobs\DrainOutbox;
+use ArtisanBuild\TelltaleClient\NullTelltaleClient;
 use ArtisanBuild\TelltaleClient\Storage\ClientDatabase;
+use ArtisanBuild\TelltaleClient\Support\DrainScheduler;
 use GuzzleHttp\Psr7\Request;
 use Illuminate\Contracts\Queue\Factory as QueueFactory;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Contracts\Queue\Queue;
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\RequestInterface;
@@ -80,4 +83,14 @@ it('queues one bounded database drain trigger without inline HTTP or duplicate s
     Telltale::optOut();
     Telltale::event('ignored');
     expect(app(ClientDatabase::class)->outboxCount())->toBe(0);
+});
+
+it('releases failed drain jobs with a bounded fallback delay', function (): void {
+    config()->set('telltale.backoff.initial_seconds', 17);
+    $queueJob = Mockery::mock(Job::class);
+    $queueJob->shouldReceive('release')->once()->with(17);
+    $job = new DrainOutbox;
+    $job->setJob($queueJob);
+
+    $job->handle(new NullTelltaleClient, app(DrainScheduler::class));
 });
