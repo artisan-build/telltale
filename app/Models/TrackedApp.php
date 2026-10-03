@@ -51,4 +51,16 @@ final class TrackedApp extends Model
     {
         return $this->hasMany(StoredEvent::class, 'app_id');
     }
+
+    /** @return HasMany<TrackedSession, $this> */
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(TrackedSession::class, 'app_id');
+    }
+
+    /** @return HasMany<ErrorGroup, $this> */
+    public function errorGroups(): HasMany
+    {
+        return $this->hasMany(ErrorGroup::class, 'app_id');
+    }
 }
