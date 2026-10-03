@@ -1,68 +1,77 @@
-# {{FILL: app name}}
+# Telltale
 
-> **Built for Cloud app scaffold.** Replace every `{{FILL: ...}}` marker with product-specific
-> information, then remove this blockquote.
+Telltale is a pre-launch, self-hosted product analytics and error-reporting system for NativePHP
+desktop and mobile apps. Its server runs in the developer's Laravel Cloud account, while a small
+client package will capture device-side events for MCP-first analysis.
 
-{{FILL: One-sentence description of the app and the problem it solves.}}
+> **Status: pre-launch scaffold.** This repository currently contains the Laravel server shell,
+> package boundaries, and quality/release tooling. Event capture, registration, ingest, storage,
+> aggregation, MCP tools, and product UI have not shipped yet.
 
-## Who It Is For
+## Repository Layout
 
-{{FILL: Describe the primary users and the outcome they need.}}
+- `/` - the Telltale Laravel server application.
+- `packages/telltale-contracts` - versioned wire contracts shared by client and server.
+- `packages/telltale-client` - the package installed in NativePHP applications.
 
-## What It Does
+The packages are Composer path repositories during development and are designed to be split into
+read-only mirrors for lockstep releases.
 
-{{FILL: List the app's current capabilities. Do not describe planned features as shipped.}}
+## Product Boundaries
 
-## Built For Cloud
-
-{{FILL: Explain how this app participates in the Built for Cloud ecosystem and link to its product
-surface when one exists.}}
-
-## Setting the manifest
-
-Before the first deploy, replace every placeholder in the `manifest` block of
-`config/built-for-cloud.php`:
-
-| Field | Set it to |
-| --- | --- |
-| `name` | The product's display name as Scalpels lists it. |
-| `slug` | The product's lower-kebab-case Scalpels catalog slug. |
-| `description` | One sentence saying what the product does, as on its Scalpels product page. |
-| `icon` | `https://scalpels.app/img/products/transparent/{slug}.png` |
-| `product_url` | `https://scalpels.app/products/{slug}` |
-
-The `slug` must exactly match the product's Scalpels catalog slug; its artwork loads from
-`https://scalpels.app/img/products/transparent/{slug}.png`.
+Telltale v1 will support events, screen views, estimated sessions, release adoption, product
+analytics, and the PHP error paths exposed by NativePHP. Native crashes, OOM failures, ANRs,
+background mobile uploads, session replay, feature flags, and a chart dashboard are not part of v1.
 
 ## Local Development
 
+Requires PHP 8.4+, Composer, and PostgreSQL. Create local databases named `telltale` and
+`telltale_app_test`, then run:
+
 ```bash
-composer setup
+composer install --no-interaction --prefer-dist
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+composer -d packages/telltale-contracts install --no-interaction --prefer-dist
+composer -d packages/telltale-client install --no-interaction --prefer-dist
 composer dev
 ```
 
-This app is nodeless by design. Do not add Node, npm, Vite, or a frontend build step. Static assets
+Telltale is nodeless by design. Do not add Node, npm, Vite, or a frontend build step. Static assets
 are committed under `public/build`.
 
 ## Quality Gate
 
+`composer ready` is the hard gate. It regenerates IDE helpers, runs Rector and root/package Pint,
+performs root and package static analysis, runs all three Pest suites, and audits every Composer lock
+file.
+
+Focused package commands are also available:
+
 ```bash
-composer ready
+composer packages:lint:check
+composer packages:stan
+composer packages:test
+composer packages:audit
 ```
 
-{{FILL: Document any additional focused or integration test commands required by this app.}}
+CI defines the required `ci (8.4)`, `ci (8.5)`, and `quality` check contexts. The test matrix uses
+PostgreSQL 16, not SQLite.
 
-## Deployment
+## Built For Cloud
 
-Artisan Build agents handling Laravel Cloud work must follow
-`brain/skills/laravel-cloud-deploy/SKILL.md`. Start with read-only discovery. Credentials come from
-the authenticated Laravel Cloud CLI; discover application and environment identifiers rather than
-guessing or committing them. Keep `.cloud/config.json` uncommitted, and verify the application and
-its attached resources after every deployment.
+The server uses `artisan-build/built-for-cloud` for its authentication and credential foundation.
+Its Scalpels-facing manifest is maintained in `config/built-for-cloud.php`. No Laravel Cloud
+environment or resource has been provisioned by this scaffold.
 
-{{FILL: Document the app-specific Laravel Cloud deployment workflow and environments without
-committing secrets, identifiers, or machine-specific configuration.}}
+## Releases
+
+Tags matching `v*` run the package split workflow. Before the first tag, the read-only
+`artisan-build/telltale-contracts` and `artisan-build/telltale-client` mirror repositories must be
+seeded and the repository must receive a fine-grained `SPLIT_REPO_TOKEN` with Contents: write.
+Neither mirrors nor tags are created by the scaffold.
 
 ## Repository
 
-{{FILL: owner/repo URL}}
+<https://github.com/artisan-build/telltale>

@@ -1,20 +1,22 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "artisan-build/built-for-cloud-starter",
+    "name": "artisan-build/telltale",
     "type": "project",
-    "description": "A nodeless Laravel starter kit for Built for Cloud products.",
+    "description": "The self-hosted Telltale server for NativePHP product analytics and error reporting.",
     "keywords": [
+        "nativephp",
+        "product-analytics",
+        "error-reporting",
         "laravel",
         "laravel-cloud",
         "livewire",
-        "nodeless",
-        "starter-kit"
+        "nodeless"
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
+        "artisan-build/telltale-contracts": "^1.0",
         "artisan-build/built-for-cloud": "^0.19.8",
-        "artisan-build/hone-client": "^1.4",
         "laravel/chisel": "^0.1.0",
         "laravel/framework": "^13.19",
         "laravel/tinker": "^3.0",
@@ -23,6 +25,7 @@
         "livewire/livewire": "^4.1"
     },
     "require-dev": {
+        "artisan-build/kibble": "^1.2",
         "barryvdh/laravel-ide-helper": "^3.6",
         "driftingly/rector-laravel": "^2.1",
         "fakerphp/faker": "^1.24",
@@ -38,6 +41,15 @@
         "phpstan/phpstan": "^2.1",
         "rector/rector": "^2.3"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "packages/*",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "autoload": {
         "psr-4": {
             "App\\": "app/",
@@ -94,13 +106,37 @@
             "@php -r \"file_put_contents('_ide_helper_models.php', rtrim((string) file_get_contents('_ide_helper_models.php')) . PHP_EOL);\"",
             "@php artisan ide-helper:meta"
         ],
+        "packages:lint": [
+            "composer -d packages/telltale-contracts lint",
+            "composer -d packages/telltale-client lint"
+        ],
+        "packages:lint:check": [
+            "composer -d packages/telltale-contracts lint:check",
+            "composer -d packages/telltale-client lint:check"
+        ],
+        "packages:stan": [
+            "composer -d packages/telltale-contracts stan",
+            "composer -d packages/telltale-client stan"
+        ],
+        "packages:test": [
+            "composer -d packages/telltale-contracts test",
+            "composer -d packages/telltale-client test"
+        ],
+        "packages:audit": [
+            "composer -d packages/telltale-contracts audit --abandoned=report",
+            "composer -d packages/telltale-client audit --abandoned=report"
+        ],
         "ready": [
             "@ide-helper",
             "@rector",
             "@lint",
+            "@packages:lint",
             "@stan",
+            "@packages:stan",
             "@test",
-            "composer audit"
+            "@packages:test",
+            "composer audit --abandoned=report",
+            "@packages:audit"
         ],
         "report": [
             "@php -r \"echo PHP_EOL . '=== Rector ===' . PHP_EOL;\"",
@@ -112,7 +148,7 @@
             "@php -r \"echo PHP_EOL . '=== Tests ===' . PHP_EOL;\"",
             "-@php artisan test",
             "@php -r \"echo PHP_EOL . '=== Security Audit ===' . PHP_EOL;\"",
-            "-composer audit"
+            "-composer audit --abandoned=report"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
@@ -123,12 +159,6 @@
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
-        ],
-        "post-create-project-cmd": [
-            "@php -r \"if (file_exists('stubs/install-stubs.php')) { require 'stubs/install-stubs.php'; }\"",
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"

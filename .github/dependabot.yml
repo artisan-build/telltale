@@ -3,9 +3,6 @@ version: 2
 updates:
   # PHP dependencies.
   #
-  # This kit has no git tags, so `laravel new --using=` resolves `dev-main`: whatever sits in
-  # composer.lock on main is inherited by every project scaffolded from the kit, immediately. That
-  # makes stale transitive dependencies here a downstream problem, not just a local one.
   - package-ecosystem: composer
     directory: "/"
     schedule:
@@ -16,7 +13,7 @@ updates:
     versioning-strategy: increase-if-necessary
     groups:
       # Batch patch + minor into a single weekly PR. One PR per package would mean 20+ PRs a week on
-      # a starter kit, and a queue that large stops being read — which is the exact failure this
+      # this application, and a queue that large stops being read, which is the failure this
       # config exists to prevent.
       composer:
         applies-to: version-updates
