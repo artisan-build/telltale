@@ -102,6 +102,9 @@
         ],
         "ide-helper": [
             "@php artisan ide-helper:generate",
+            "@putenv DB_CONNECTION=pgsql",
+            "@putenv DB_DATABASE=telltale_app_test",
+            "@putenv DB_URL=",
             "@php artisan ide-helper:models --write-mixin --no-interaction",
             "@php -r \"file_put_contents('_ide_helper_models.php', rtrim((string) file_get_contents('_ide_helper_models.php')) . PHP_EOL);\"",
             "@php artisan ide-helper:meta"

@@ -12,6 +12,8 @@ final readonly class EnvelopeV1 implements JsonSerializable
 {
     public const VERSION = 1;
 
+    public const MAX_CLIENT_VERSION_LENGTH = 255;
+
     /**
      * @var list<Event>
      */
@@ -31,6 +33,14 @@ final readonly class EnvelopeV1 implements JsonSerializable
 
         if ($clientVersion === '') {
             throw new ContractException('client_version must not be empty.');
+        }
+
+        if (str_contains($clientVersion, "\0")) {
+            throw new ContractException('client_version must not contain NUL bytes.');
+        }
+
+        if (strlen($clientVersion) > self::MAX_CLIENT_VERSION_LENGTH) {
+            throw new ContractException('client_version exceeds the maximum length of 255 bytes.');
         }
 
         if ($droppedEventsTotal < 0) {

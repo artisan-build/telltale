@@ -9,6 +9,10 @@ use stdClass;
 
 final readonly class Event implements JsonSerializable
 {
+    public const MAX_NAME_LENGTH = 255;
+
+    public const MAX_SESSION_ID_LENGTH = 255;
+
     public const MAX_PROPERTY_KEY_LENGTH = 128;
 
     public const MAX_PROPERTY_STRING_LENGTH = 4096;
@@ -34,9 +38,9 @@ final readonly class Event implements JsonSerializable
             throw new ContractException('event_id must be a canonical ULID.');
         }
 
-        self::assertNonEmpty($name, 'name');
+        self::assertBoundedText($name, self::MAX_NAME_LENGTH, 'name');
         self::assertTimestamp($timestamp);
-        self::assertNonEmpty($sessionId, 'session_id');
+        self::assertBoundedText($sessionId, self::MAX_SESSION_ID_LENGTH, 'session_id');
 
         if ($props !== [] && array_is_list($props)) {
             throw new ContractException('props must be a JSON object.');
@@ -169,8 +173,21 @@ final readonly class Event implements JsonSerializable
             throw new ContractException("{$field} must be valid UTF-8.");
         }
 
+        if (str_contains($value, "\0")) {
+            throw new ContractException("{$field} must not contain NUL bytes.");
+        }
+
         if ($value === '') {
             throw new ContractException("{$field} must not be empty.");
+        }
+    }
+
+    private static function assertBoundedText(string $value, int $maximum, string $field): void
+    {
+        self::assertNonEmpty($value, $field);
+
+        if (strlen($value) > $maximum) {
+            throw new ContractException("{$field} exceeds the maximum length of {$maximum} bytes.");
         }
     }
 
@@ -233,6 +250,10 @@ final readonly class Event implements JsonSerializable
                 throw new ContractException('props strings must be valid UTF-8.');
             }
 
+            if (str_contains($value, "\0")) {
+                throw new ContractException('props strings must not contain NUL bytes.');
+            }
+
             if (strlen($value) > self::MAX_PROPERTY_STRING_LENGTH) {
                 throw new ContractException('A props string exceeds the maximum length.');
             }
@@ -267,6 +288,10 @@ final readonly class Event implements JsonSerializable
     {
         if (preg_match('//u', $key) !== 1) {
             throw new ContractException('props keys must be valid UTF-8.');
+        }
+
+        if (str_contains($key, "\0")) {
+            throw new ContractException('props keys must not contain NUL bytes.');
         }
 
         if (strlen($key) > self::MAX_PROPERTY_KEY_LENGTH) {
