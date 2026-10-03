@@ -8,6 +8,7 @@ use App\Enums\AggregateDimension;
 use App\Models\DailyActiveInstall;
 use App\Models\DailyAggregate;
 use App\Models\ErrorGroup;
+use App\Models\ErrorGroupInstall;
 use App\Models\IngestHealthDaily;
 use App\Models\Install;
 use App\Models\StoredEvent;
@@ -96,15 +97,24 @@ final readonly class McpAnalytics
         $metricDimension = $metric === 'screen'
             ? AggregateDimension::Screen
             : AggregateDimension::EventName;
+        $breakdownDimension = $metric === 'screen'
+            ? match ($breakdown) {
+                'version' => AggregateDimension::ScreenVersion,
+                'platform' => AggregateDimension::ScreenPlatform,
+                'os' => AggregateDimension::ScreenOperatingSystem,
+                'locale' => AggregateDimension::ScreenLocale,
+                default => null,
+            }
+        : ($breakdown === 'none' ? null : AggregateDimension::from($breakdown));
 
         return [
             'app_id' => $app->id,
             'window_days' => $days,
             'metric' => $metric,
             'counts' => $this->aggregateRows($app, $from, $metricDimension),
-            'breakdown' => $breakdown === 'none'
+            'breakdown' => $breakdownDimension === null
                 ? []
-                : $this->aggregateRows($app, $from, AggregateDimension::from($breakdown)),
+                : $this->aggregateRows($app, $from, $breakdownDimension),
         ];
     }
 
@@ -138,9 +148,19 @@ final readonly class McpAnalytics
     public function releaseAdoption(TrackedApp $app, int $days): array
     {
         $from = CarbonImmutable::now('UTC')->subDays($days - 1)->toDateString();
+        $versions = DailyActiveInstall::query()
+            ->where('app_id', $app->id)
+            ->where('active_date', '>=', $from)
+            ->distinct()
+            ->orderBy('app_version')
+            ->limit(101)
+            ->pluck('app_version');
+        $versionsTruncated = $versions->count() > 100;
+        $versions = $versions->take(100);
         $rows = DailyActiveInstall::query()
             ->where('app_id', $app->id)
             ->where('active_date', '>=', $from)
+            ->whereIn('app_version', $versions)
             ->selectRaw('active_date, app_version, COUNT(DISTINCT install_id) AS active_installs')
             ->groupBy('active_date', 'app_version')
             ->oldest('active_date')
@@ -157,7 +177,7 @@ final readonly class McpAnalytics
             ->pluck('active_installs', 'active_date');
         $firstAdoptions = DailyActiveInstall::query()
             ->where('app_id', $app->id)
-            ->where('active_date', '>=', $from)
+            ->whereIn('app_version', $versions)
             ->selectRaw('app_version, install_id, MIN(active_date) AS first_adopted_on')
             ->groupBy('app_version', 'install_id');
         $speed = DB::query()->fromSub($firstAdoptions, 'first_adoptions')
@@ -194,7 +214,7 @@ final readonly class McpAnalytics
         return [
             'app_id' => $app->id,
             'window_days' => $days,
-            'truncated' => $truncated,
+            'truncated' => $versionsTruncated || $truncated,
             'adoption' => $adoption,
             'update_speed' => $speed,
         ];
@@ -297,11 +317,21 @@ final readonly class McpAnalytics
         $newIds = $newSince === null
             ? []
             : collect($this->errors->newSinceVersion($app, $newSince))->pluck('id')->all();
-        $groups = ErrorGroup::query()
+        $windowedErrors = StoredEvent::query()
             ->where('app_id', $app->id)
-            ->where('last_seen_at', '>=', $from)
-            ->latest('last_seen_at')
-            ->orderBy('id')
+            ->whereNotNull('error_group_id')
+            ->where('occurred_at', '>=', $from)
+            ->selectRaw('error_group_id, COUNT(*) AS window_occurrences')
+            ->selectRaw('COUNT(DISTINCT install_id) AS window_installs_affected')
+            ->selectRaw('MAX(occurred_at) AS window_last_seen_at')
+            ->groupBy('error_group_id');
+        $groups = ErrorGroup::query()
+            ->joinSub($windowedErrors, 'windowed_errors', 'windowed_errors.error_group_id', '=', 'error_groups.id')
+            ->where('error_groups.app_id', $app->id)
+            ->select('error_groups.*')
+            ->addSelect(['windowed_errors.window_occurrences', 'windowed_errors.window_installs_affected'])
+            ->orderByDesc('windowed_errors.window_last_seen_at')
+            ->orderBy('error_groups.id')
             ->limit($limit)
             ->get();
 
@@ -310,8 +340,8 @@ final readonly class McpAnalytics
             'window_days' => $days,
             'groups' => $groups->map(fn (ErrorGroup $group): array => [
                 'fingerprint' => $group->fingerprint,
-                'count' => $group->total_occurrences,
-                'installs_affected' => $group->installs_affected,
+                'count' => (int) $group->getAttribute('window_occurrences'),
+                'installs_affected' => (int) $group->getAttribute('window_installs_affected'),
                 'first_seen_at' => $group->first_seen_at->toAtomString(),
                 'last_seen_at' => $group->last_seen_at->toAtomString(),
                 'first_version' => $group->first_version,
@@ -339,7 +369,7 @@ final readonly class McpAnalytics
             'first_version' => $group->first_version,
             'last_version' => $group->last_version,
             'sample_error' => $group->sample_error,
-            'context_distribution' => $group->sample_context,
+            'context_distribution' => $this->errorContextDistribution($app, $group),
         ];
     }
 
@@ -401,6 +431,42 @@ final readonly class McpAnalytics
                 'value' => $row->dimension_value,
                 'count' => (int) $row->getAttribute('total'),
             ])->all();
+    }
+
+    /** @return array<string, array{truncated: bool, values: list<array{value: string, installs: int}>}> */
+    private function errorContextDistribution(TrackedApp $app, ErrorGroup $group): array
+    {
+        $distribution = [];
+        $dimensions = [
+            'app_version' => "error_group_installs.sample_context->>'app_version'",
+            'platform' => "error_group_installs.sample_context->>'platform'",
+            'os' => "error_group_installs.sample_context->>'os'",
+            'locale' => "error_group_installs.sample_context->>'locale'",
+        ];
+
+        foreach ($dimensions as $dimension => $expression) {
+            $rows = ErrorGroupInstall::query()
+                ->join('error_groups', 'error_groups.id', '=', 'error_group_installs.error_group_id')
+                ->where('error_groups.app_id', $app->id)
+                ->where('error_group_installs.error_group_id', $group->id)
+                ->whereRaw("{$expression} IS NOT NULL")
+                ->selectRaw("{$expression} AS value, COUNT(*) AS installs")
+                ->groupByRaw($expression)
+                ->orderByDesc('installs')
+                ->orderBy('value')
+                ->limit(26)
+                ->get();
+
+            $distribution[$dimension] = [
+                'truncated' => $rows->count() > 25,
+                'values' => $rows->take(25)->map(fn (ErrorGroupInstall $row): array => [
+                    'value' => (string) $row->getAttribute('value'),
+                    'installs' => (int) $row->getAttribute('installs'),
+                ])->all(),
+            ];
+        }
+
+        return $distribution;
     }
 
     /** @return list<array{value: string, users: int}> */

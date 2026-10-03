@@ -22,8 +22,10 @@ use App\Mcp\Tools\RevokeInstall;
 use App\Mcp\Tools\RotateIngestKey;
 use App\Mcp\Tools\ScreenFlow;
 use App\Mcp\Tools\Sessions;
+use App\Models\DailyActiveInstall;
 use App\Models\DailyAggregate;
 use App\Models\ErrorGroup;
+use App\Models\ErrorGroupInstall;
 use App\Models\Install;
 use App\Models\StoredEvent;
 use App\Models\TrackedApp;
@@ -320,7 +322,7 @@ it('serves every read tool family from test-created PostgreSQL facts', function 
             ['value' => 'checkout', 'count' => 2],
             ['value' => 'home', 'count' => 2],
         ],
-        'breakdown' => [['value' => 'en-US', 'count' => 12]],
+        'breakdown' => [['value' => 'en-US', 'count' => 4]],
     ])->and(telltaleMcpTool('active_users', ['app_id' => $app->id], $token))->toMatchArray([
         'dau' => 2,
         'wau' => 2,
@@ -366,11 +368,257 @@ it('serves every read tool family from test-created PostgreSQL facts', function 
         ], $token))->toMatchArray([
             'fingerprint' => $fingerprint,
             'installs_affected' => 2,
+            'context_distribution' => [
+                'app_version' => [
+                    'truncated' => false,
+                    'values' => [['value' => '2.0.0', 'installs' => 2]],
+                ],
+                'platform' => [
+                    'truncated' => false,
+                    'values' => [['value' => 'mobile', 'installs' => 2]],
+                ],
+                'os' => [
+                    'truncated' => false,
+                    'values' => [['value' => 'iOS 19', 'installs' => 2]],
+                ],
+                'locale' => [
+                    'truncated' => false,
+                    'values' => [['value' => 'en-US', 'installs' => 2]],
+                ],
+            ],
         ])
         ->and(telltaleMcpTool('install_timeline', [
             'app_id' => $app->id,
             'install_id' => $first->install_uuid,
         ], $token)['events'])->toHaveCount(6);
+});
+
+it('aligns every event_counts breakdown with the requested metric and app', function (): void {
+    $token = telltaleMcpCredential([TelltaleAbility::Read->value]);
+    [$app, $ingest] = storageApp();
+    [, $installToken] = storageInstall($app, $ingest);
+    [$otherApp, $otherIngest] = storageApp();
+    [, $otherToken] = storageInstall($otherApp, $otherIngest);
+
+    $this->withToken($installToken)->postJson('/api/ingest', storageEnvelope([
+        storageEvent('session.context', 'context', '2026-10-03T09:00:00Z', 'metric-session', [
+            'props' => [
+                'app_version' => '2.0.0',
+                'platform' => 'mobile',
+                'os' => 'iOS 19',
+                'locale' => 'en-US',
+            ],
+        ]),
+        storageEvent('home', 'screen', '2026-10-03T09:00:01Z', 'metric-session'),
+        storageEvent('checkout', 'screen', '2026-10-03T09:00:02Z', 'metric-session'),
+        storageEvent('purchase', 'event', '2026-10-03T09:00:03Z', 'metric-session'),
+    ]))->assertAccepted();
+    $this->withToken($otherToken)->postJson('/api/ingest', storageEnvelope([
+        storageEvent('session.context', 'context', '2026-10-03T09:00:00Z', 'other-session', [
+            'props' => [
+                'app_version' => '9.0.0',
+                'platform' => 'desktop',
+                'os' => 'macOS',
+                'locale' => 'fr-FR',
+            ],
+        ]),
+        storageEvent('other', 'screen', '2026-10-03T09:00:01Z', 'other-session'),
+    ]))->assertAccepted();
+
+    foreach ([
+        'version' => '2.0.0',
+        'platform' => 'mobile',
+        'os' => 'iOS 19',
+        'locale' => 'en-US',
+    ] as $breakdown => $value) {
+        expect(telltaleMcpTool('event_counts', [
+            'app_id' => $app->id,
+            'metric' => 'event',
+            'breakdown' => $breakdown,
+        ], $token)['breakdown'])->toBe([['value' => $value, 'count' => 4]])
+            ->and(telltaleMcpTool('event_counts', [
+                'app_id' => $app->id,
+                'metric' => 'screen',
+                'breakdown' => $breakdown,
+            ], $token)['breakdown'])->toBe([['value' => $value, 'count' => 2]]);
+    }
+});
+
+it('calculates release speed from retained history for only the bounded displayed versions', function (): void {
+    $token = telltaleMcpCredential([TelltaleAbility::Read->value]);
+    [$app] = storageApp();
+    [$otherApp] = storageApp();
+
+    foreach ([
+        [1, '2026-08-01'],
+        [1, '2026-09-04'],
+        [2, '2026-09-20'],
+        [3, '2026-09-25'],
+    ] as [$installId, $date]) {
+        DailyActiveInstall::query()->create([
+            'app_id' => $app->id,
+            'active_date' => $date,
+            'install_id' => $installId,
+            'app_version' => '0-target',
+            'platform' => 'desktop',
+            'os' => 'macOS',
+        ]);
+    }
+
+    foreach (range(1, 100) as $version) {
+        DailyActiveInstall::query()->create([
+            'app_id' => $app->id,
+            'active_date' => '2026-10-03',
+            'install_id' => 100 + $version,
+            'app_version' => sprintf('v%03d', $version),
+            'platform' => 'desktop',
+            'os' => 'macOS',
+        ]);
+    }
+
+    DailyActiveInstall::query()->create([
+        'app_id' => $otherApp->id,
+        'active_date' => '2026-07-01',
+        'install_id' => 1,
+        'app_version' => '0-target',
+        'platform' => 'mobile',
+        'os' => 'iOS',
+    ]);
+
+    $result = telltaleMcpTool('release_adoption', [
+        'app_id' => $app->id,
+        'days' => 30,
+    ], $token);
+    $adoptionVersions = collect($result['adoption'])->pluck('version')->unique()->values();
+
+    expect($result['truncated'])->toBeTrue()
+        ->and($adoptionVersions)->toHaveCount(100)
+        ->and($adoptionVersions)->not->toContain('v100')
+        ->and($result['update_speed'])->toHaveCount(100)
+        ->and($result['update_speed'][0])->toBe([
+            'version' => '0-target',
+            'first_seen_on' => '2026-08-01',
+            'median_days_from_first_seen' => 50,
+        ]);
+});
+
+it('scopes error counts and affected installs to the requested window and app', function (): void {
+    $token = telltaleMcpCredential([TelltaleAbility::Read->value]);
+    [$app, $ingest] = storageApp();
+    [, $oldToken] = storageInstall($app, $ingest);
+    [, $recentToken] = storageInstall($app, $ingest);
+    [$otherApp, $otherIngest] = storageApp();
+    [, $otherToken] = storageInstall($otherApp, $otherIngest);
+    $error = [
+        'class' => 'RuntimeException',
+        'message' => 'Windowed failure',
+        'file' => '/app/Window.php',
+        'line' => 10,
+        'stack' => ['Window::fail'],
+        'fingerprint' => 'windowed-error',
+    ];
+
+    foreach ([
+        [$oldToken, '2026-10-01T10:00:00Z', 'old-session'],
+        [$recentToken, '2026-10-03T10:00:00Z', 'recent-session'],
+        [$otherToken, '2026-10-03T11:00:00Z', 'other-session'],
+    ] as [$deviceToken, $timestamp, $session]) {
+        $this->withToken($deviceToken)->postJson('/api/ingest', storageEnvelope([
+            storageEvent('error.reported', 'error', $timestamp, $session, ['error' => $error]),
+        ]))->assertAccepted();
+    }
+
+    expect(telltaleMcpTool('errors', [
+        'app_id' => $app->id,
+        'days' => 1,
+    ], $token)['groups'])->toHaveCount(1)
+        ->and(telltaleMcpTool('errors', [
+            'app_id' => $app->id,
+            'days' => 1,
+        ], $token)['groups'][0])->toMatchArray([
+            'count' => 1,
+            'installs_affected' => 1,
+        ]);
+});
+
+it('returns a bounded app-scoped context distribution for one error group', function (): void {
+    $token = telltaleMcpCredential([TelltaleAbility::Read->value]);
+    [$app] = storageApp();
+    [$otherApp] = storageApp();
+    $fingerprint = str_repeat('a', 64);
+    $group = ErrorGroup::query()->create([
+        'app_id' => $app->id,
+        'fingerprint' => $fingerprint,
+        'first_seen_at' => '2026-10-03T10:00:00Z',
+        'last_seen_at' => '2026-10-03T11:00:00Z',
+        'first_version' => '2.0.0',
+        'last_version' => '2.0.0',
+        'total_occurrences' => 26,
+        'installs_affected' => 26,
+        'sample_error' => ['class' => 'RuntimeException'],
+        'sample_context' => ['platform' => 'platform-00'],
+    ]);
+    $otherGroup = ErrorGroup::query()->create([
+        'app_id' => $otherApp->id,
+        'fingerprint' => $fingerprint,
+        'first_seen_at' => '2026-10-03T10:00:00Z',
+        'last_seen_at' => '2026-10-03T10:00:00Z',
+        'first_version' => '9.0.0',
+        'last_version' => '9.0.0',
+        'total_occurrences' => 1,
+        'installs_affected' => 1,
+        'sample_error' => ['class' => 'RuntimeException'],
+        'sample_context' => ['platform' => 'other-app'],
+    ]);
+
+    foreach (range(0, 25) as $index) {
+        ErrorGroupInstall::query()->create([
+            'error_group_id' => $group->id,
+            'install_id' => $index + 1,
+            'first_seen_at' => '2026-10-03T10:00:00Z',
+            'last_seen_at' => '2026-10-03T10:00:00Z',
+            'first_version' => '2.0.0',
+            'last_version' => '2.0.0',
+            'occurrence_count' => 1,
+            'sample_error' => ['class' => 'RuntimeException'],
+            'sample_context' => [
+                'app_version' => '2.0.0',
+                'platform' => sprintf('platform-%02d', $index),
+                'os' => 'Test OS',
+                'locale' => 'en-US',
+            ],
+        ]);
+    }
+    ErrorGroupInstall::query()->create([
+        'error_group_id' => $otherGroup->id,
+        'install_id' => 1,
+        'first_seen_at' => '2026-10-03T10:00:00Z',
+        'last_seen_at' => '2026-10-03T10:00:00Z',
+        'first_version' => '9.0.0',
+        'last_version' => '9.0.0',
+        'occurrence_count' => 1,
+        'sample_error' => ['class' => 'RuntimeException'],
+        'sample_context' => [
+            'app_version' => '9.0.0',
+            'platform' => 'other-app',
+            'os' => 'Other OS',
+            'locale' => 'fr-FR',
+        ],
+    ]);
+
+    $distribution = telltaleMcpTool('error_detail', [
+        'app_id' => $app->id,
+        'fingerprint' => $fingerprint,
+    ], $token)['context_distribution'];
+
+    expect($distribution['app_version'])->toBe([
+        'truncated' => false,
+        'values' => [['value' => '2.0.0', 'installs' => 26]],
+    ])->and($distribution['platform']['truncated'])->toBeTrue()
+        ->and($distribution['platform']['values'])->toHaveCount(25)
+        ->and($distribution['platform']['values'][0])->toBe(['value' => 'platform-00', 'installs' => 1])
+        ->and($distribution['platform']['values'][24])->toBe(['value' => 'platform-24', 'installs' => 1])
+        ->and($distribution['platform']['values'])->not->toContain(['value' => 'other-app', 'installs' => 1]);
 });
 
 it('shows fresh accepted ingest in event_counts in one cycle and never double-counts replay', function (): void {

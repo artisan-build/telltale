@@ -225,6 +225,10 @@ final class EventProjector
 
         if ($event->type === EventType::Screen) {
             $values[AggregateDimension::Screen->value] = $event->name;
+            $values[AggregateDimension::ScreenVersion->value] = $dimensions['app_version'];
+            $values[AggregateDimension::ScreenPlatform->value] = $dimensions['platform'];
+            $values[AggregateDimension::ScreenOperatingSystem->value] = $dimensions['os'];
+            $values[AggregateDimension::ScreenLocale->value] = $dimensions['locale'];
         }
 
         foreach ($values as $dimension => $value) {
