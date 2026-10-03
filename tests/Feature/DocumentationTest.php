@@ -34,6 +34,7 @@ it('ships complete privacy and platform reference sections', function (): void {
             'NSPrivacyCollectedDataTypeOtherDiagnosticData',
             'NSPrivacyCollectedDataTypeDeviceID',
             'App Store Privacy Label',
+            'Other Identifiers (the install id)',
             'Google Play Data Safety',
             'use it for tracking',
         )

@@ -34,9 +34,13 @@ final readonly class TelltaleDashboard
         $validated = $request->validate(['name' => ['required', 'string']]);
         $name = (string) $validated['name'];
 
-        if (strlen($name) > AppManager::MAX_NAME_LENGTH || str_contains($name, "\0")) {
+        if (
+            preg_match('//u', $name) !== 1
+            || strlen($name) > AppManager::MAX_NAME_LENGTH
+            || str_contains($name, "\0")
+        ) {
             throw ValidationException::withMessages([
-                'name' => 'The app name must be valid text no longer than 255 bytes.',
+                'name' => 'The app name must be valid UTF-8 text no longer than 255 bytes.',
             ]);
         }
 

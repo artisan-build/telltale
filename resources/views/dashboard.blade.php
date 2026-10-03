@@ -33,7 +33,7 @@
                         <a href="{{ route('telltale.apps.show', $app['id']) }}"
                            class="rounded-xl border px-4 py-3 text-sm transition {{ $selected?->id === $app['id'] ? 'border-clay-iron bg-clay-slip text-clay-ink' : 'border-clay-edge bg-clay-surface text-clay-soft hover:border-clay-dot' }}">
                             <strong class="block text-clay-ink">{{ $app['name'] }}</strong>
-                            <span>{{ $app['last_seen_at'] === null ? 'No ingest yet' : 'Last ingest '.$app['last_seen_at'] }}</span>
+                            <span>{{ $app['last_seen_at'] === null ? 'No retained events' : 'Latest retained event '.$app['last_seen_at'] }}</span>
                         </a>
                     @endforeach
                 </nav>
@@ -84,11 +84,11 @@
                 </div>
                 <dl class="grid gap-3 sm:grid-cols-3">
                     <div class="rounded-xl bg-clay-slip p-4">
-                        <dt class="text-sm text-clay-muted">Rejections</dt>
+                        <dt class="text-sm text-clay-muted">Known app-attributed rejections</dt>
                         <dd class="mt-1 text-2xl font-semibold text-clay-ink">{{ $health['rejections'] }}</dd>
                     </div>
                     <div class="rounded-xl bg-clay-slip p-4">
-                        <dt class="text-sm text-clay-muted">Rate-limit hits</dt>
+                        <dt class="text-sm text-clay-muted">Known app-attributed rate-limit hits</dt>
                         <dd class="mt-1 text-2xl font-semibold text-clay-ink">{{ $health['rate_limit_hits'] }}</dd>
                     </div>
                     <div class="rounded-xl bg-clay-slip p-4">

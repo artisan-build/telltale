@@ -116,7 +116,13 @@ it('keeps app and recent health reads scoped and bounded with truthful empty sta
     $content = $response->getContent();
 
     expect($content)->toContain('4321', '2345', '3456', 'client-25')
-        ->not->toContain('8765', '5678', '7654', 'client-00')
+        ->toContain(
+            'Known app-attributed rejections',
+            'Known app-attributed rate-limit hits',
+            'Latest retained event',
+            'No retained events',
+        )
+        ->not->toContain('8765', '5678', '7654', 'client-00', 'Last ingest', 'No ingest yet')
         ->and(substr_count($content, 'client-'))->toBe(25);
 
     TrackedApp::query()->delete();
@@ -124,6 +130,19 @@ it('keeps app and recent health reads scoped and bounded with truthful empty sta
         ->assertOk()
         ->assertSeeHtml('data-testid="app-empty"')
         ->assertSee('No apps yet.');
+});
+
+it('returns validation errors for invalid UTF-8 app names', function (): void {
+    signIntoPackageUi($this);
+
+    $this->from('/dashboard')
+        ->post('/dashboard/apps', ['name' => "Invalid\xFFname"])
+        ->assertRedirect('/dashboard')
+        ->assertSessionHasErrors([
+            'name' => 'The app name must be valid UTF-8 text no longer than 255 bytes.',
+        ]);
+
+    expect(TrackedApp::query()->count())->toBe(0);
 });
 
 it('caps the app list at one hundred rows', function (): void {
