@@ -1,0 +1,532 @@
+[
+    {
+        "name": "apps",
+        "title": "Apps",
+        "description": "List up to 100 tracked apps with last-seen activity, live versions, and cumulative client drops.",
+        "inputSchema": {
+            "type": "object",
+            "properties": [],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "ingest_health",
+        "title": "Ingest Health",
+        "description": "Report app-scoped client drops, known rejections, rate-limit hits, and recently seen client versions.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "days": {
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 90,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "event_counts",
+        "title": "Event Counts",
+        "description": "Return durable event or screen counts and an optional version, platform, OS, or locale breakdown.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "days": {
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 90,
+                    "type": "integer"
+                },
+                "metric": {
+                    "default": "event",
+                    "enum": [
+                        "event",
+                        "screen"
+                    ],
+                    "type": "string"
+                },
+                "breakdown": {
+                    "default": "none",
+                    "enum": [
+                        "none",
+                        "version",
+                        "platform",
+                        "os",
+                        "locale"
+                    ],
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "active_users",
+        "title": "Active Users",
+        "description": "Return app-scoped DAU, WAU, and MAU with version and platform breakdowns.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "as_of": {
+                    "description": "UTC date in YYYY-MM-DD format.",
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "release_adoption",
+        "title": "Release Adoption",
+        "description": "Return daily active-install counts and shares by app version.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "days": {
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 90,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "screen_flow",
+        "title": "Screen Flow",
+        "description": "Return ordered screen transitions and session entry and exit screens from retained raw events.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "days": {
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 90,
+                    "type": "integer"
+                },
+                "limit": {
+                    "default": 20,
+                    "minimum": 1,
+                    "maximum": 50,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "funnel",
+        "title": "Funnel",
+        "description": "Calculate ordered per-install funnel conversion and drop-off from retained raw events.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "steps": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "items": {
+                        "minLength": 1,
+                        "maxLength": 255,
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "days": {
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 90,
+                    "type": "integer"
+                },
+                "window_minutes": {
+                    "default": 1440,
+                    "minimum": 1,
+                    "maximum": 10080,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id",
+                "steps"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "retention",
+        "title": "Retention",
+        "description": "Return first-seen-week cohorts and weekly returning-install retention.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "weeks": {
+                    "default": 8,
+                    "minimum": 0,
+                    "maximum": 12,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "sessions",
+        "title": "Sessions",
+        "description": "Return session count, length distribution, and average screens from retained sessions.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "days": {
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 90,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "errors",
+        "title": "Errors",
+        "description": "List bounded app-scoped error groups with counts, affected installs, versions, and new-since status.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "days": {
+                    "default": 30,
+                    "minimum": 1,
+                    "maximum": 90,
+                    "type": "integer"
+                },
+                "new_since_version": {
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "type": "string"
+                },
+                "limit": {
+                    "default": 25,
+                    "minimum": 1,
+                    "maximum": 50,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "error_detail",
+        "title": "Error Detail",
+        "description": "Return one app-scoped error group with bounded sample stack data and context.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "fingerprint": {
+                    "minLength": 64,
+                    "maxLength": 64,
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id",
+                "fingerprint"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "install_timeline",
+        "title": "Install Timeline",
+        "description": "Return up to 200 ordered retained events for exactly one app-scoped install or client session.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "install_id": {
+                    "minLength": 36,
+                    "maxLength": 36,
+                    "type": "string"
+                },
+                "session_id": {
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "type": "string"
+                },
+                "limit": {
+                    "default": 100,
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "delete_install",
+        "title": "Delete Install",
+        "description": "Preview, then delete one app-scoped install and its raw history while preserving durable aggregates.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "install_id": {
+                    "minLength": 36,
+                    "maxLength": 36,
+                    "type": "string"
+                },
+                "confirm": {
+                    "type": "string",
+                    "description": "Single-use confirmation returned by this tool preview."
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id",
+                "install_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "destructiveHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "destructive",
+            "two_phase": {
+                "confirmationArgument": "confirm",
+                "protocolVersion": 1
+            }
+        }
+    },
+    {
+        "name": "revoke_install",
+        "title": "Revoke Install",
+        "description": "Preview, then revoke one app-scoped install token without deleting its history.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "install_id": {
+                    "minLength": 36,
+                    "maxLength": 36,
+                    "type": "string"
+                },
+                "confirm": {
+                    "type": "string",
+                    "description": "Single-use confirmation returned by this tool preview."
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id",
+                "install_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "destructiveHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "destructive",
+            "two_phase": {
+                "confirmationArgument": "confirm",
+                "protocolVersion": 1
+            }
+        }
+    },
+    {
+        "name": "rotate_ingest_key",
+        "title": "Rotate Ingest Key",
+        "description": "Preview, then invalidate one app ingest key and return its replacement exactly once.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "confirm": {
+                    "type": "string",
+                    "description": "Single-use confirmation returned by this tool preview."
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "destructiveHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "destructive",
+            "two_phase": {
+                "confirmationArgument": "confirm",
+                "protocolVersion": 1
+            }
+        }
+    }
+]

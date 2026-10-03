@@ -6,7 +6,9 @@ namespace App\Http\Controllers;
 
 use App\Domain\Ingest\CredentialAuthenticator;
 use App\Domain\Ingest\EventIngestor;
+use App\Domain\Ingest\IngestHealthRecorder;
 use App\Domain\Ingest\IngestRequestLimiter;
+use App\Exceptions\IngestVolumeExceeded;
 use App\Exceptions\InvalidIngestCredential;
 use App\Http\Middleware\EnforceIngestBodyLimit;
 use ArtisanBuild\TelltaleContracts\ContractException;
@@ -22,6 +24,7 @@ final class IngestController extends Controller
         Request $request,
         CredentialAuthenticator $authenticator,
         IngestRequestLimiter $limiter,
+        IngestHealthRecorder $health,
         EventIngestor $ingestor,
     ): JsonResponse {
         $token = (string) $request->bearerToken();
@@ -38,10 +41,14 @@ final class IngestController extends Controller
             $body = $request->attributes->get(EnforceIngestBodyLimit::BODY_ATTRIBUTE);
             $decoded = json_decode(is_string($body) ? $body : $request->getContent(), flags: JSON_THROW_ON_ERROR);
         } catch (JsonException) {
+            $health->rejection($install->app);
+
             return response()->json(['message' => 'The envelope is not valid JSON.'], 422);
         }
 
         if (! $decoded instanceof stdClass) {
+            $health->rejection($install->app);
+
             return response()->json(['message' => 'The envelope must be a JSON object.'], 422);
         }
 
@@ -50,6 +57,8 @@ final class IngestController extends Controller
         $maximumEvents = config('telltale.ingest.max_events_per_batch');
 
         if (is_array($events) && is_int($maximumEvents) && count($events) > $maximumEvents) {
+            $health->rejection($install->app);
+
             return response()->json([
                 'message' => "A batch may contain at most {$maximumEvents} events.",
             ], 422);
@@ -59,6 +68,8 @@ final class IngestController extends Controller
             $version = EnvelopeV1::versionFrom($payload);
 
             if ($version > EnvelopeV1::VERSION) {
+                $health->rejection($install->app);
+
                 return response()->json([
                     'message' => "Envelope version {$version} is newer than this server supports. Upgrade the Telltale server before retrying.",
                     'supported_envelope_version' => EnvelopeV1::VERSION,
@@ -67,13 +78,21 @@ final class IngestController extends Controller
 
             $envelope = EnvelopeV1::fromArray($payload);
         } catch (ContractException $exception) {
+            $health->rejection($install->app);
+
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
         try {
             $result = $ingestor->ingest($install, $token, $envelope);
         } catch (InvalidIngestCredential) {
+            $health->rejection($install->app);
+
             return $this->invalidCredential();
+        } catch (IngestVolumeExceeded $exception) {
+            $health->rejection($install->app);
+
+            throw $exception;
         }
 
         return response()->json([

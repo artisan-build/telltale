@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Authorization\TelltaleAbility;
+use ArtisanBuild\BuiltForCloud\CredentialAbilityRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -22,8 +24,9 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    public function boot(CredentialAbilityRegistry $credentialAbilities): void
     {
+        $credentialAbilities->register(TelltaleAbility::Read->value);
         $this->configureDefaults();
     }
 

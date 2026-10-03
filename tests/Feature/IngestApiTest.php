@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Ingest\AppManager;
 use App\Domain\Ingest\Credential;
+use App\Domain\Ingest\IngestHealthRecorder;
 use App\Domain\Ingest\IngestRequestLimiter;
 use App\Models\Install;
 use App\Models\StoredEvent;
@@ -450,7 +451,10 @@ it('masks credential hash bindings in PostgreSQL query exceptions', function ():
 });
 
 it('uses an irreversible IP cache key when the production database cache is used', function (): void {
-    $limiter = new IngestRequestLimiter(new LaravelRateLimiter(Cache::store('database')));
+    $limiter = new IngestRequestLimiter(
+        new LaravelRateLimiter(Cache::store('database')),
+        resolve(IngestHealthRecorder::class),
+    );
     $request = Request::create('/api/register', 'POST', server: ['REMOTE_ADDR' => '203.0.113.41']);
 
     $limiter->consumeIp($request);

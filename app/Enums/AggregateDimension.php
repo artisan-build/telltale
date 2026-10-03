@@ -11,4 +11,5 @@ enum AggregateDimension: string
     case Version = 'version';
     case Platform = 'platform';
     case OperatingSystem = 'os';
+    case Locale = 'locale';
 }
