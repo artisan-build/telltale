@@ -8,7 +8,7 @@ use App\Models\StoredEvent;
 use App\Models\TrackedApp;
 
 it('creates apps with a one-time high-entropy ingest value and only a hash at rest', function (): void {
-    $created = app(AppManager::class)->create('Dreiland');
+    $created = resolve(AppManager::class)->create('Dreiland');
     $app = $created->app();
     $ingestValue = $created->ingestValue();
 
@@ -22,7 +22,7 @@ it('creates apps with a one-time high-entropy ingest value and only a hash at re
 });
 
 it('rotates an app ingest value and immediately rejects the old value', function (): void {
-    $manager = app(AppManager::class);
+    $manager = resolve(AppManager::class);
     $created = $manager->create('Dreiland');
     $app = $created->app();
     $oldValue = $created->ingestValue();
@@ -41,7 +41,7 @@ it('rotates an app ingest value and immediately rejects the old value', function
 });
 
 it('stores configurable positive limits per app', function (): void {
-    $app = app(AppManager::class)->create('Limited', [
+    $app = resolve(AppManager::class)->create('Limited', [
         'rate_per_minute' => 7,
         'install_rate_per_minute' => 3,
         'daily_event_cap' => 90,

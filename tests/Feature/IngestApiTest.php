@@ -23,7 +23,7 @@ use Illuminate\Support\Str;
  */
 function createIngestApp(array $limits = []): array
 {
-    $created = app(AppManager::class)->create('Test app '.Str::random(8), $limits);
+    $created = resolve(AppManager::class)->create('Test app '.Str::random(8), $limits);
 
     return [$created->app(), $created->ingestValue()];
 }
