@@ -5,6 +5,8 @@ includes:
 parameters:
     paths:
         - app/
+        - packages/telltale-client/src/
+        - packages/telltale-contracts/src/
     excludePaths:
         - **/*Test.php
     scanFiles:

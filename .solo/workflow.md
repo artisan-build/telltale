@@ -1,75 +1,94 @@
-# Workflow - {{FILL: app name}}
+# Workflow - Telltale
 
-Project profile for the `multi-agent-build` skill and every agent working in this Built for Cloud
-app. The coordinator reads this first. Replace every `{{FILL: ...}}` marker before dispatching work,
-then keep the profile truthful as the app evolves.
+Project profile for the `multi-agent-build` skill and every agent working on Telltale. The
+coordinator reads this first.
 
-This repository is an app scaffolded from `artisan-build/built-for-cloud-starter`; it is not the
-starter kit. Never open app pull requests against the starter kit or its nodeless upstream.
-
-## What This Is
-
-{{FILL: Describe the product, its users, the problem it solves, and its explicit non-goals.}}
+Telltale is a pre-launch, self-hosted product analytics and error-reporting system for NativePHP
+applications. The monorepo contains its server, versioned contracts, and device-side client package.
+Product behavior lands only through the PR sequence in the authoritative plan.
 
 ## Phase And Mode
 
-- phase: {{FILL: greenfield | building | launched}}
-- default mode: {{FILL: A-autonomous | B-human-merges}}
-- merge policy: {{FILL: State when changes may merge and whether human review is required.}}
-- merge method: {{FILL: State the exact gh command and branch deletion policy.}}
+- phase: `pre-launch`
+- default mode: `A-autonomous`
+- merge policy: `merge on green CI; no human PR code review (brain, under Ed's MVP-speed directive, 2026-10-03)`
+- security review: PR2 (ingest/register) and PR6 (MCP) require the full independent quality reviewer
+  + acceptance judge pair before merge.
+- merge method: `gh pr merge --squash`
+
+## Role Resolution
+
+Resolve implementer, quality reviewer, and acceptance judge roles at runtime from
+`~/Herd/brain/agents.json` by following `~/Herd/brain/playbooks/resolve-agent-role.md`. This profile
+does not pin a harness map.
 
 ## Hard Gate
 
-- command: `composer ready` (ide-helper regen + rector + pint + phpstan + pest + composer audit)
-- extra suites: {{FILL: none, or list them}}
-- monorepo: {{FILL: no, or describe the package layout}}
+- command: `composer ready`
+- order: IDE helper generation, Rector, root Pint, package Pint, root PHPStan/Larastan, package
+  PHPStan, root Pest, both package Pest suites, root Composer audit, and both package audits.
+- package suites: `composer packages:lint:check`, `composer packages:stan`,
+  `composer packages:test`, and `composer packages:audit`.
+- monorepo: the Laravel server is at root; path repositories are
+  `packages/telltale-contracts` and `packages/telltale-client`.
 
-The coordinator verifies the hard gate on the committed SHA with a clean tree.
+The coordinator runs the full hard gate once on the committed candidate with a clean tree.
+Implementers run only focused tests covering their changes, then static analysis and lint once before
+handoff.
 
 ## CI
 
-- status: {{FILL: verified | unverified}}
-- required jobs: {{FILL: Name the testing and static-analysis jobs that gate merges.}}
-- workflows: `.github/workflows/tests.yml` and `.github/workflows/lint.yml`
+- status: defined; the coordinator verifies it on the pull request.
+- exact required contexts: `ci (8.4)`, `ci (8.5)`, and `quality`.
+- `.github/workflows/tests.yml`: root Rector, root PHPStan/Larastan, root Pest, both package
+  static-analysis and Pest suites, and Composer audits on PHP 8.4 and 8.5 against PostgreSQL 16.
+- `.github/workflows/lint.yml`: root and package Pint checks on PHP 8.5.
+- both workflows target pushes and pull requests to `main`.
 
-Do not use CI as an autonomous merge gate until both testing and static analysis are verified.
+Do not rename the jobs or matrix entries without updating branch protection; required contexts are
+literal strings.
 
 ## Dependency Install
 
-- command: `composer install --no-interaction --prefer-dist`
-- post-install: `cp .env.example .env && php artisan key:generate`
-- tests use in-memory SQLite through `phpunit.xml`
-
-## Harness Map
-
-- implementer: {{FILL: runtime and Solo agent_tool_id}}
-- quality reviewer: {{FILL: different model lineage and Solo agent_tool_id}}
-- acceptance judge: {{FILL: another model lineage and Solo agent_tool_id}}
+- root: `composer install --no-interaction --prefer-dist`
+- contracts: `composer -d packages/telltale-contracts install --no-interaction --prefer-dist`
+- client: `composer -d packages/telltale-client install --no-interaction --prefer-dist`
+- local post-install: copy `.env.example` to `.env`, run `php artisan key:generate`, and migrate.
+- PostgreSQL prerequisites: local databases `telltale` and `telltale_app_test`; CI creates
+  `telltale_app_test` through its PostgreSQL 16 service.
+- tests use the real `telltale_app_test` PostgreSQL database configured in `phpunit.xml`, never
+  SQLite.
 
 ## Ship Details
 
 - branch naming: `feat/<slug>` (`fix/<slug>` for fixes, `chore/<slug>` for maintenance)
-- PR target repo: {{FILL: owner/repo - REQUIRED}}
-- release or split steps: {{FILL: none, or describe them}}
+- PR target: `artisan-build/telltale`, branch `main`
+- release trigger: tags matching `v*` run `.github/workflows/release.yml` and `kibble:split` both
+  packages in lockstep.
+- release prerequisites: seed the read-only `artisan-build/telltale-contracts` and
+  `artisan-build/telltale-client` mirrors and grant a fine-grained `SPLIT_REPO_TOKEN` with Contents:
+  write before any tag is pushed. Do not create mirrors or tags as part of ordinary feature work.
 
 ## Plan And Coordination
 
-- plan location: {{FILL: Solo scratchpad or standing PRD path}}
-- Solo project: {{FILL: project name and ID - REQUIRED}}
-- run log: per-build scratchpad named `<branch>-run-log`
+- plan: `/Users/edgrosvenor/Herd/brain/projects/telltale/PRD.md` (section 2 is locked)
+- build brief: `/Users/edgrosvenor/Herd/brain/projects/telltale/brief-mvp-build.md`
+- Solo project: Telltale, id 74
+- run log: `Telltale MVP build - run log`
 
 ## Built For Cloud App
 
-- app role: {{FILL: Describe how this app participates in the Built for Cloud ecosystem.}}
-- manifest: {{FILL: Record the manifest path and ownership once configured.}}
-- deployment: {{FILL: Record the Laravel Cloud environment conventions without secrets or app IDs.}}
+- app role: customer-owned server for NativePHP product analytics and error reporting.
+- manifest: `config/built-for-cloud.php`.
+- deployment: no environment or resource is provisioned by the scaffold. Laravel Cloud resource
+  settings are managed by Cloud and must not be shadowed with hand-written variables.
 
 ## Stack Notes
 
-- Laravel 13, Livewire 4, Flux 2, and PHP 8.3 or newer.
+- Laravel 13, Livewire 4, Flux 2, and PHP 8.4 or newer.
 - Nodeless by design: no Node, npm, Vite, or frontend build step.
 - Tailwind is served from `public/build/assets/app.css`; regenerate it only with
   `php artisan tailwind:optimize` and commit the output.
 - `composer ready` regenerates committed IDE helper files. `.phpstorm.meta.php` remains ignored.
-- Keep `phpstan-baseline.neon` shrinking.
-- {{FILL: Add app-specific quirks and conventions, or delete this line if there are none.}}
+- Keep `phpstan-baseline.neon` empty.
+- Client real-device verification is blocked until the later Dreiland integration has Xcode.

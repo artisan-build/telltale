@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 return [
     'manifest' => [
-        'name' => 'App Name',
-        'slug' => 'app-name',
-        'description' => 'Replace with one sentence describing what this app does.',
-        'icon' => 'https://scalpels.app/img/products/transparent/app-name.png',
-        'product_url' => 'https://scalpels.app/products/app-name',
+        'name' => 'Telltale',
+        'slug' => 'telltale',
+        'description' => 'Self-hosted product analytics and error reporting for NativePHP apps.',
+        'icon' => 'https://scalpels.app/img/products/transparent/telltale.png',
+        'product_url' => 'https://scalpels.app/products/telltale',
     ],
 
     'credentials' => [
