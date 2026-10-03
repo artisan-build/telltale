@@ -330,7 +330,7 @@ final readonly class McpAnalytics
             ->where('error_groups.app_id', $app->id)
             ->select('error_groups.*')
             ->addSelect(['windowed_errors.window_occurrences', 'windowed_errors.window_installs_affected'])
-            ->orderByDesc('windowed_errors.window_last_seen_at')
+            ->latest('windowed_errors.window_last_seen_at')
             ->orderBy('error_groups.id')
             ->limit($limit)
             ->get();
