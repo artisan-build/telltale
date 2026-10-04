@@ -36,8 +36,12 @@ Regenerate the setup artifacts with `php artisan telltale:generate-docs --local`
 
 ## Local Development
 
-Requires PHP 8.4+, Composer, and PostgreSQL. Create local databases named `telltale` and
-`telltale_app_test`, then run:
+Requires PHP 8.4+, Composer, and PostgreSQL. The root application depends on the commercial
+`livewire/flux` package, so `composer install` at the root needs your own Flux Pro licence
+configured in Composer. The `telltale-contracts` and `telltale-client` packages have no commercial
+dependency and install on their own without a licence.
+
+Create local databases named `telltale` and `telltale_app_test`, then run:
 
 ```bash
 composer install --no-interaction --prefer-dist
