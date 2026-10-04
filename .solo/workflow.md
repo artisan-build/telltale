@@ -1,26 +1,16 @@
 # Workflow - Telltale
 
-Project profile for the `multi-agent-build` skill and every agent working on Telltale. The
-coordinator reads this first.
+Project profile for Telltale: what to run, what CI requires, and the rules the stack depends on.
+Read this before opening a pull request. Maintainer-private notes live outside this repo.
 
 Telltale is a pre-launch, self-hosted product analytics and error-reporting system for NativePHP
 applications. The monorepo contains its server, versioned contracts, and device-side client package.
-Product behavior lands only through the PR sequence in the authoritative plan.
 
 ## Phase And Mode
 
 - phase: `pre-launch`
-- default mode: `A-autonomous`
-- merge policy: `merge on green CI; no human PR code review (brain, under Ed's MVP-speed directive, 2026-10-03)`
-- security review: PR2 (ingest/register) and PR6 (MCP) require the full independent quality reviewer
-  + acceptance judge pair before merge.
+- merge policy: `merge on green CI (all required checks)`
 - merge method: `gh pr merge --squash`
-
-## Role Resolution
-
-Resolve implementer, quality reviewer, and acceptance judge roles at runtime from
-`~/Herd/brain/agents.json` by following `~/Herd/brain/playbooks/resolve-agent-role.md`. This profile
-does not pin a harness map.
 
 ## Hard Gate
 
@@ -32,13 +22,13 @@ does not pin a harness map.
 - monorepo: the Laravel server is at root; path repositories are
   `packages/telltale-contracts` and `packages/telltale-client`.
 
-The coordinator runs the full hard gate once on the committed candidate with a clean tree.
-Implementers run only focused tests covering their changes, then static analysis and lint once before
-handoff.
+Run the full hard gate once on the committed candidate with a clean tree. While work is in
+progress, run only the focused tests covering the changed files, then static analysis and lint once
+before finalizing.
 
 ## CI
 
-- status: defined; the coordinator verifies it on the pull request.
+- status: defined; verified on the pull request.
 - exact required contexts: `server (8.5)`, `client (8.4)`, `client (8.5)`, and `quality`.
 - `.github/workflows/tests.yml`: the `server (8.5)` job runs root and contracts checks on PHP
   8.5 against PostgreSQL 16; standalone client jobs run client static analysis, Pest, and audit on
@@ -59,6 +49,8 @@ literal strings.
   creates `telltale_app_test` through its PostgreSQL 16 service. Client CI jobs do not use PostgreSQL.
 - tests use the real `telltale_app_test` PostgreSQL database configured in `phpunit.xml`, never
   SQLite.
+- the root application requires a `livewire/flux` (Flux Pro) licence to install; the
+  `telltale-contracts` and `telltale-client` packages do not.
 
 ## Ship Details
 
@@ -69,13 +61,6 @@ literal strings.
 - release prerequisites: seed the read-only `artisan-build/telltale-contracts` and
   `artisan-build/telltale-client` mirrors and grant a fine-grained `SPLIT_REPO_TOKEN` with Contents:
   write before any tag is pushed. Do not create mirrors or tags as part of ordinary feature work.
-
-## Plan And Coordination
-
-- plan: `/Users/edgrosvenor/Herd/brain/projects/telltale/PRD.md` (section 2 is locked)
-- build brief: `/Users/edgrosvenor/Herd/brain/projects/telltale/brief-mvp-build.md`
-- Solo project: Telltale, id 74
-- run log: `Telltale MVP build - run log`
 
 ## Built For Cloud App
 

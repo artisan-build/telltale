@@ -25,8 +25,9 @@ updates:
         update-types:
           - minor
           - patch
-    # Majors are deliberately absent from both groups. Dependabot opens them individually, and they
-    # are never auto-merged (see dependabot-auto-merge.yml) — a human decides.
+    # Majors are deliberately absent from both groups, so Dependabot opens them individually. No
+    # auto-merge workflow exists in this repository: every Dependabot PR, major or not, merges only
+    # when a maintainer merges it.
 
   # GitHub Actions.
   #

@@ -5,10 +5,9 @@ desktop and mobile apps. A Composer client will run on devices and report to a c
 Built for Cloud server. The product is MCP-first and has no analytics dashboard beyond its setup and
 management UI.
 
-The authoritative product definition is
-`/Users/edgrosvenor/Herd/brain/projects/telltale/PRD.md`; section 2 is locked. Read it before adding
-product behavior. The current repository is only the server scaffold, package boundaries, and
-quality/release tooling.
+The authoritative product definition is maintained privately by the maintainers and is not part of
+this repository; its scope section is locked. Treat the product boundaries below as the public
+statement of scope, and raise an issue before adding product behavior that is not covered by them.
 
 ## Product Boundaries
 
