@@ -49,8 +49,8 @@ literal strings.
   creates `telltale_app_test` through its PostgreSQL 16 service. Client CI jobs do not use PostgreSQL.
 - tests use the real `telltale_app_test` PostgreSQL database configured in `phpunit.xml`, never
   SQLite.
-- the root application requires a `livewire/flux` (Flux Pro) licence to install; the
-  `telltale-contracts` and `telltale-client` packages do not.
+- no part of the monorepo requires a commercial licence to install; only the free
+  `livewire/flux` package is required, and Flux Pro (`php artisan flux:pro`) is optional.
 
 ## Ship Details
 

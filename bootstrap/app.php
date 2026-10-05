@@ -1,11 +1,9 @@
 <?php
 
-use App\Console\Commands\ConfigureBuiltForCloud;
 use App\Console\Commands\DeleteInstallData;
 use App\Console\Commands\GenerateDocumentation;
 use App\Console\Commands\InstallFluxPro;
 use App\Console\Commands\OptimizeTailwind;
-use App\Console\Commands\PruneRawEvents;
 use App\Http\Middleware\RejectIngestCredentialsFromReadSurface;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,12 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withCommands([
-        ConfigureBuiltForCloud::class,
         DeleteInstallData::class,
         GenerateDocumentation::class,
         InstallFluxPro::class,
         OptimizeTailwind::class,
-        PruneRawEvents::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->prepend(RejectIngestCredentialsFromReadSurface::class);

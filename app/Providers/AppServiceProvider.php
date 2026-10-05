@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Authorization\TelltaleAbility;
+use App\Console\Commands\PruneRawEvents;
 use ArtisanBuild\BuiltForCloud\CredentialAbilityRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -18,7 +19,11 @@ class AppServiceProvider extends ServiceProvider
     #[\Override]
     public function register(): void
     {
-        //
+        // Scheduled commands are registered here so the Built for Cloud system-authority
+        // conformance inventory can attribute each schedule entry to inspectable source.
+        $this->commands([
+            PruneRawEvents::class,
+        ]);
     }
 
     /**
