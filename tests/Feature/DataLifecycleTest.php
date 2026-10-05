@@ -10,6 +10,8 @@ use App\Models\ErrorGroupInstall;
 use App\Models\Install;
 use App\Models\StoredEvent;
 use App\Models\TrackedSession;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
@@ -91,4 +93,18 @@ it('prunes expired raw events and deletes only the selected app install without 
     $this->withToken($firstToken)->postJson('/api/ingest', storageEnvelope([
         storageEvent('rejected', 'event', '2026-10-03T12:00:00Z', 'deleted-install'),
     ]))->assertUnauthorized();
+});
+
+it('schedules the raw event prune daily so the configured retention window is enforced without anyone running it by hand', function (): void {
+    $scheduled = collect(resolve(Schedule::class)->events())
+        ->filter(fn (Event $event): bool => str_contains((string) $event->command, 'telltale:prune-events'))
+        ->values();
+
+    expect($scheduled)->toHaveCount(1);
+
+    $event = $scheduled->first();
+
+    expect($event->expression)->toBe('10 3 * * *')
+        ->and($event->withoutOverlapping)->toBeTrue()
+        ->and($event->onOneServer)->toBeTrue();
 });
