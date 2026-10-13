@@ -12,6 +12,8 @@
 .env.production
 /.env.bfc.lock
 /composer.json.bfc.lock
+/packages/telltale-client/composer.lock
+/packages/telltale-contracts/composer.lock
 .phpactor.json
 .phpstorm.meta.php
 .phpunit.result.cache
