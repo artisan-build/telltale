@@ -14,14 +14,25 @@ client package captures device-side events for MCP-first analysis.
 - `packages/telltale-contracts` - versioned wire contracts shared by client and server.
 - `packages/telltale-client` - the package installed in NativePHP applications.
 
-The packages are Composer path repositories during development and are designed to be split into
-read-only mirrors for lockstep releases.
+The monorepo uses Composer path repositories for local development, while tagged releases are split
+into read-only mirrors and published to Packagist for installation in other applications.
 
 ## Product Boundaries
 
 Telltale v1 will support events, screen views, estimated sessions, release adoption, product
 analytics, and the PHP error paths exposed by NativePHP. Native crashes, OOM failures, ANRs,
 background mobile uploads, session replay, feature flags, and a chart dashboard are not part of v1.
+
+## Client Installation
+
+The client and contracts packages are published on Packagist at v1.0.0. The published client requires
+Laravel 13; support for Laravel 11 and 12 is already on `main` and will be included in the next release.
+
+Install the client in a Laravel 13 NativePHP application:
+
+```bash
+composer require artisan-build/telltale-client
+```
 
 ## Documentation
 
@@ -83,10 +94,9 @@ environment or resource has been provisioned by this scaffold.
 
 ## Releases
 
-Tags matching `v*` run the package split workflow. Before the first tag, the read-only
-`artisan-build/telltale-contracts` and `artisan-build/telltale-client` mirror repositories must be
-seeded and the repository must receive a fine-grained `SPLIT_REPO_TOKEN` with Contents: write.
-Neither mirrors nor tags are created by the scaffold.
+Tags matching `v*` run the package split workflow. Telltale v1.0.0 was split to the read-only
+`artisan-build/telltale-contracts` and `artisan-build/telltale-client` mirrors and published on
+Packagist. Later releases use the same workflow.
 
 ## Repository
 
