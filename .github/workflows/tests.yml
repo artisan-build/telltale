@@ -107,3 +107,58 @@ jobs:
 
       - name: Audit client dependencies
         run: composer -d packages/telltale-client audit --abandoned=report
+
+  lowest-deps:
+    name: tests (lowest deps) - Laravel ${{ matrix.laravel }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - laravel: '11'
+            testbench: '^9.0'
+            pest: '^3.0'
+          - laravel: '12'
+            testbench: '^10.0'
+            pest: '^3.0'
+          - laravel: '13'
+            testbench: '^11.0'
+            pest: '^4.0'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+
+      - name: Pin Laravel ${{ matrix.laravel }} lowest dependencies
+        working-directory: packages/telltale-client
+        run: |
+          composer config audit.block-insecure false
+          composer remove --dev larastan/larastan --no-update
+          composer require --no-update \
+            "illuminate/bus:^${{ matrix.laravel }}.0" \
+            "illuminate/console:^${{ matrix.laravel }}.0" \
+            "illuminate/encryption:^${{ matrix.laravel }}.0" \
+            "illuminate/http:^${{ matrix.laravel }}.0" \
+            "illuminate/queue:^${{ matrix.laravel }}.0" \
+            "illuminate/support:^${{ matrix.laravel }}.0"
+          composer require --dev --no-update \
+            "orchestra/testbench:${{ matrix.testbench }}" \
+            "pestphp/pest:${{ matrix.pest }}"
+
+      - name: Install lowest dependencies
+        run: composer -d packages/telltale-client update --prefer-lowest --prefer-stable -W --no-interaction
+
+      - name: Show resolved Laravel version
+        run: composer -d packages/telltale-client show laravel/framework
+
+      - name: Run client tests
+        run: composer -d packages/telltale-client test
