@@ -350,6 +350,26 @@ it('rejects invalid client versions', function (mixed $version): void {
     'overlong' => [str_repeat('v', EnvelopeV1::MAX_CLIENT_VERSION_LENGTH + 1)],
 ]);
 
+it('rejects non-Event members in the typed events list', function (): void {
+    $event = Event::fromArray(validEvent());
+
+    expect(fn () => new EnvelopeV1('1.2.3', 0, [$event, 'not-an-event']))
+        ->toThrow(ContractException::class);
+});
+
+it('emits unescaped slashes in the v1 JSON wire format', function (): void {
+    $envelope = EnvelopeV1::fromArray(validEnvelope([
+        'events' => [validEvent(['props' => ['url' => 'https://example.com/a/b']])],
+    ]));
+
+    expect($envelope->toJson())->toContain('"https://example.com/a/b"');
+});
+
+it('pins the envelope wire constants to their contract literals', function (): void {
+    expect(EnvelopeV1::VERSION)->toBe(1)
+        ->and(EnvelopeV1::MAX_CLIENT_VERSION_LENGTH)->toBe(255);
+});
+
 it('never admits identity or credential fields into the body', function (): void {
     $payload = validEnvelope([
         'install_token' => 'header-only',
