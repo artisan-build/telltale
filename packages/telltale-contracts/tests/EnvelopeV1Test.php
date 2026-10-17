@@ -175,6 +175,13 @@ it('accepts bounded error details at every upper limit', function (): void {
         ->toBe($error);
 });
 
+it('pins the error wire caps to their contract literals', function (): void {
+    expect(ErrorDetails::MAX_MESSAGE_LENGTH)->toBe(4096)
+        ->and(ErrorDetails::MAX_FILE_LENGTH)->toBe(1024)
+        ->and(ErrorDetails::MAX_STACK_FRAMES)->toBe(100)
+        ->and(ErrorDetails::MAX_STACK_FRAME_LENGTH)->toBe(2048);
+});
+
 it('accepts bounded error details at their lower limits', function (array $overrides): void {
     $event = validEvent(['type' => 'error', 'error' => validError($overrides)]);
 
@@ -184,6 +191,7 @@ it('accepts bounded error details at their lower limits', function (array $overr
     'one-byte file' => [['file' => 'f']],
     'empty stack' => [['stack' => []]],
     'empty frame' => [['stack' => ['']]],
+    'line one' => [['line' => 1]],
 ]);
 
 it('rejects error details over every cap', function (array $error): void {
@@ -210,6 +218,10 @@ it('rejects malformed error detail values', function (array $error): void {
     'stack contains non-string' => [validError(['stack' => [1]])],
     'empty fingerprint' => [validError(['fingerprint' => ''])],
     'null fingerprint' => [validError(['fingerprint' => null])],
+    'NUL in class' => [validError(['class' => "RuntimeException\0evil"])],
+    'NUL in fingerprint' => [validError(['fingerprint' => "runtime\0evil"])],
+    'invalid UTF-8 class' => [validError(['class' => "\xB1\x31"])],
+    'invalid UTF-8 fingerprint' => [validError(['fingerprint' => "\xB1\x31"])],
 ]);
 
 it('accepts property keys and strings at both caps', function (): void {
