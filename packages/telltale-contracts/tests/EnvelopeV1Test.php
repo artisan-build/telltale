@@ -252,6 +252,54 @@ it('rejects property keys and strings over both caps recursively', function (arr
     'nested string' => [['nested' => ['value' => str_repeat('v', Event::MAX_PROPERTY_STRING_LENGTH + 1)]]],
 ]);
 
+it('validates nested objects decoded from JSON recursively', function (array $nested): void {
+    $json = json_encode(
+        validEnvelope(['events' => [validEvent(['props' => ['nested' => $nested]])]]),
+        JSON_THROW_ON_ERROR,
+    );
+
+    EnvelopeV1::fromJson($json);
+})->throws(ContractException::class)->with([
+    'oversized key in object' => [[str_repeat('k', Event::MAX_PROPERTY_KEY_LENGTH + 1) => true]],
+    'oversized string in object' => [['value' => str_repeat('v', Event::MAX_PROPERTY_STRING_LENGTH + 1)]],
+    'NUL in object string' => [['value' => "text\0invalid"]],
+]);
+
+it('validates values inside nested JSON lists', function (mixed $child): void {
+    EnvelopeV1::fromArray(validEnvelope(['events' => [validEvent(['props' => ['values' => [$child]]])]]));
+})->throws(ContractException::class)->with([
+    'infinity in list' => [INF],
+    'oversized string in list' => [str_repeat('v', Event::MAX_PROPERTY_STRING_LENGTH + 1)],
+    'object in list' => [new DateTimeImmutable],
+    'invalid UTF-8 in list' => ["\xB1\x31"],
+]);
+
+it('recursively normalizes nested containers in toArray', function (): void {
+    $event = new Event(
+        eventId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        name: 'checkout.completed',
+        type: EventType::Event,
+        timestamp: '2026-10-03T12:34:56.123Z',
+        sessionId: 'session-1',
+        props: [
+            'obj' => new stdClass,
+            'deep' => ['deeper' => new stdClass, 'list' => [new stdClass]],
+        ],
+    );
+
+    expect($event->toArray()['props'])->toBe([
+        'obj' => [],
+        'deep' => ['deeper' => [], 'list' => [[]]],
+    ]);
+});
+
+it('pins the event wire caps to their contract literals', function (): void {
+    expect(Event::MAX_NAME_LENGTH)->toBe(255)
+        ->and(Event::MAX_SESSION_ID_LENGTH)->toBe(255)
+        ->and(Event::MAX_PROPERTY_KEY_LENGTH)->toBe(128)
+        ->and(Event::MAX_PROPERTY_STRING_LENGTH)->toBe(4096);
+});
+
 it('rejects non-finite and non-JSON property values', function (mixed $value): void {
     EnvelopeV1::fromArray(validEnvelope(['events' => [validEvent(['props' => ['value' => $value]])]]));
 })->throws(ContractException::class)->with([
