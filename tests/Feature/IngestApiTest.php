@@ -11,12 +11,12 @@ use App\Http\Middleware\EnforceIngestBodyLimit;
 use App\Models\Install;
 use App\Models\StoredEvent;
 use App\Models\TrackedApp;
-use Carbon\Carbon;
 use Illuminate\Cache\RateLimiter as LaravelRateLimiter;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -514,7 +514,7 @@ it('reports the remaining minute window as the retry delay', function (): void {
 });
 
 it('reports the time until the daily window resets as the retry delay', function (): void {
-    Carbon::setTestNow(Carbon::parse('2026-10-17 12:00:00', 'UTC'));
+    Date::setTestNow(Date::parse('2026-10-17 12:00:00', 'UTC'));
     [, $appLimitedValue] = createIngestApp(['daily_event_cap' => 1]);
     $token = registerInstall($appLimitedValue)['install_token'];
 
