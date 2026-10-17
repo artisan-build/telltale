@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 use App\Domain\Ingest\AppManager;
 use App\Domain\Ingest\Credential;
+use App\Domain\Ingest\EventIngestor;
 use App\Domain\Ingest\IngestHealthRecorder;
 use App\Domain\Ingest\IngestRequestLimiter;
+use App\Exceptions\InvalidIngestCredential;
 use App\Models\Install;
 use App\Models\StoredEvent;
 use App\Models\TrackedApp;
+use ArtisanBuild\TelltaleContracts\EnvelopeV1;
 use Illuminate\Cache\RateLimiter as LaravelRateLimiter;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -127,6 +130,23 @@ it('returns generic failures for missing malformed and revoked credentials', fun
         ->postJson('/api/register', ['install_id' => Install::query()->sole()->install_uuid])
         ->assertUnauthorized()
         ->assertExactJson(['message' => 'Invalid credentials.']);
+});
+
+it('rejects a token that does not belong to the resolved install', function (): void {
+    [$appA, $ingestA] = createIngestApp();
+    [, $ingestB] = createIngestApp();
+    $tokenA = registerInstall($ingestA)['install_token'];
+    $tokenB = registerInstall($ingestB)['install_token'];
+    $installA = Install::query()->where('app_id', $appA->id)->sole();
+
+    $envelope = EnvelopeV1::fromArray(ingestEnvelope());
+
+    expect(fn () => resolve(EventIngestor::class)->ingest($installA, $tokenB, $envelope))
+        ->toThrow(InvalidIngestCredential::class);
+
+    resolve(EventIngestor::class)->ingest($installA, $tokenA, $envelope);
+
+    expect(StoredEvent::query()->count())->toBe(1);
 });
 
 it('stores only credential-derived app and install identity', function (): void {

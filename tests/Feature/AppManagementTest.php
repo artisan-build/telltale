@@ -29,7 +29,8 @@ it('rotates an app ingest value and immediately rejects the old value', function
     $newValue = $manager->rotateIngestKey($app);
 
     expect($newValue)->not->toBe($oldValue)
-        ->and(TrackedApp::query()->findOrFail($app->id)->ingest_key_hash)->toBe(Credential::hash($newValue));
+        ->and(TrackedApp::query()->findOrFail($app->id)->ingest_key_hash)->toBe(Credential::hash($newValue))
+        ->and($app->ingest_key_hash)->toBe(Credential::hash($newValue));
 
     $this->postJson('/api/register', ['install_id' => fake()->uuid()], [
         'X-Telltale-Ingest' => $oldValue,
@@ -52,6 +53,12 @@ it('stores configurable positive limits per app', function (): void {
         ->and($app->install_rate_per_minute)->toBe(3)
         ->and($app->daily_event_cap)->toBe(90)
         ->and($app->install_daily_event_cap)->toBe(20);
+
+    $manager = resolve(AppManager::class);
+
+    foreach (['rate_per_minute' => 0, 'daily_event_cap' => -5, 'install_rate_per_minute' => '3'] as $name => $value) {
+        expect(fn () => $manager->create('Limited', [$name => $value]))->toThrow(InvalidArgumentException::class);
+    }
 });
 
 it('accepts app names at the storage boundary and rejects invalid names', function (): void {
@@ -63,6 +70,10 @@ it('accepts app names at the storage boundary and rejects invalid names', functi
     expect(fn () => $manager->create(str_repeat('a', AppManager::MAX_NAME_LENGTH + 1)))
         ->toThrow(InvalidArgumentException::class)
         ->and(fn () => $manager->create("invalid\0name"))
+        ->toThrow(InvalidArgumentException::class)
+        ->and(fn () => $manager->create(''))
+        ->toThrow(InvalidArgumentException::class)
+        ->and(fn () => $manager->create("   \t "))
         ->toThrow(InvalidArgumentException::class);
 });
 
