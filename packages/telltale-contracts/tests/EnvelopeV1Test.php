@@ -215,6 +215,7 @@ it('rejects malformed error detail values', function (array $error): void {
     'zero line' => [validError(['line' => 0])],
     'non-integer line' => [validError(['line' => 1.5])],
     'stack is not a list' => [validError(['stack' => ['frame' => 'value']])],
+    'stack is not an array' => [validError(['stack' => 'boom'])],
     'stack contains non-string' => [validError(['stack' => [1]])],
     'empty fingerprint' => [validError(['fingerprint' => ''])],
     'null fingerprint' => [validError(['fingerprint' => null])],
@@ -270,6 +271,7 @@ it('validates values inside nested JSON lists', function (mixed $child): void {
 })->throws(ContractException::class)->with([
     'infinity in list' => [INF],
     'oversized string in list' => [str_repeat('v', Event::MAX_PROPERTY_STRING_LENGTH + 1)],
+    // Only reachable via direct fromArray construction; wire input decodes lists without objects.
     'object in list' => [new DateTimeImmutable],
     'invalid UTF-8 in list' => ["\xB1\x31"],
 ]);
