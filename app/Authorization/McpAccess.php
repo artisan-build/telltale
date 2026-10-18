@@ -16,11 +16,11 @@ use ArtisanBuild\BuiltForCloud\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 
-final class McpAccess
+final readonly class McpAccess
 {
     public function __construct(
-        private readonly ActingPrincipalResolver $principals,
-        private readonly Request $request,
+        private ActingPrincipalResolver $principals,
+        private Request $request,
     ) {}
 
     public function allows(): bool
