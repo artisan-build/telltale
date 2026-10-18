@@ -284,11 +284,9 @@ it('keeps destructive tools absent and distinguishably refused through the read 
     $token = telltaleMcpCredential([TelltaleAbility::Read->value]);
     $list = telltaleMcpRequest('/mcp', mcpListPayload(), $token)->assertOk();
 
-    expect($list->json('result.tools.*.name'))->not->toContain(
-        'delete_install',
-        'revoke_install',
-        'rotate_ingest_key',
-    );
+    foreach (['delete_install', 'revoke_install', 'rotate_ingest_key'] as $destructiveTool) {
+        expect($list->json('result.tools.*.name'))->not->toContain($destructiveTool);
+    }
 
     telltaleMcpRequest('/mcp', mcpToolPayload('delete_install', [
         'app_id' => 1,
