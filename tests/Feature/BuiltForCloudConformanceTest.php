@@ -3,6 +3,22 @@
 declare(strict_types=1);
 
 use App\Console\Commands\PruneRawEvents;
+use App\Mcp\TelltaleMcpServer;
+use App\Mcp\Tools\ActiveUsers;
+use App\Mcp\Tools\Apps;
+use App\Mcp\Tools\DeleteInstall;
+use App\Mcp\Tools\ErrorDetail;
+use App\Mcp\Tools\Errors;
+use App\Mcp\Tools\EventCounts;
+use App\Mcp\Tools\Funnel;
+use App\Mcp\Tools\IngestHealth;
+use App\Mcp\Tools\InstallTimeline;
+use App\Mcp\Tools\ReleaseAdoption;
+use App\Mcp\Tools\Retention;
+use App\Mcp\Tools\RevokeInstall;
+use App\Mcp\Tools\RotateIngestKey;
+use App\Mcp\Tools\ScreenFlow;
+use App\Mcp\Tools\Sessions;
 use ArtisanBuild\BuiltForCloud\Commands\ConsoleReKeyCommand;
 use ArtisanBuild\BuiltForCloud\Commands\ConsoleRetireKeyCommand;
 use ArtisanBuild\BuiltForCloud\Commands\CreateAdminCommand;
@@ -27,6 +43,7 @@ use ArtisanBuild\BuiltForCloud\Jobs\DeliverOwnershipWebhook;
 use ArtisanBuild\BuiltForCloud\Testing\ConsumerConformance;
 use ArtisanBuild\BuiltForCloud\Testing\ContractAssertions;
 use ArtisanBuild\BuiltForCloud\Testing\FleetConformance;
+use ArtisanBuild\BuiltForCloud\Testing\McpDelegatedEnforcement;
 use Composer\InstalledVersions;
 
 uses(ContractAssertions::class);
@@ -53,6 +70,61 @@ it('passes the version 1 reference-consumer conformance spec', function (): void
 
         return $members;
     };
+
+    $delegatedTools = [
+        Apps::class,
+        IngestHealth::class,
+        EventCounts::class,
+        ActiveUsers::class,
+        ReleaseAdoption::class,
+        ScreenFlow::class,
+        Funnel::class,
+        Retention::class,
+        Sessions::class,
+        Errors::class,
+        ErrorDetail::class,
+        InstallTimeline::class,
+        DeleteInstall::class,
+        RevokeInstall::class,
+        RotateIngestKey::class,
+    ];
+    $delegatedArguments = [
+        DeleteInstall::class => [
+            'app_id' => 1,
+            'install_id' => '10000000-0000-4000-8000-000000000001',
+        ],
+        ErrorDetail::class => [
+            'app_id' => 1,
+            'fingerprint' => str_repeat('a', 64),
+        ],
+        InstallTimeline::class => [
+            'app_id' => 1,
+            'session_id' => 'delegated-probe',
+        ],
+        RevokeInstall::class => [
+            'app_id' => 1,
+            'install_id' => '10000000-0000-4000-8000-000000000001',
+        ],
+    ];
+
+    McpDelegatedEnforcement::assertHonors(
+        TelltaleMcpServer::class,
+        $delegatedTools,
+        arguments: $delegatedArguments,
+    );
+    $delegatedProbe = McpDelegatedEnforcement::probe(
+        TelltaleMcpServer::class,
+        arguments: $delegatedArguments,
+    );
+
+    expect($delegatedProbe['tools'])->toBe($sorted($delegatedTools))
+        ->and($delegatedProbe['invoked'])->toBe($sorted($delegatedTools))
+        ->and($delegatedProbe['refusals'])->toBe([])
+        ->and($delegatedProbe['principal_mismatches'])->toBe([])
+        ->and($delegatedProbe['errors'])->toBe([])
+        ->and($delegatedProbe['unreached'])->toBe([])
+        ->and($delegatedProbe['negative_authorization'])->toBe('absent')
+        ->and($delegatedProbe['violations'])->toBe([]);
 
     $expected = [
         'runtime.meta' => [],
@@ -119,7 +191,7 @@ it('passes the version 1 reference-consumer conformance spec', function (): void
             'ArtisanBuild\BuiltForCloud\Mcp\TwoPhaseConfirmationStore|built-for-cloud.manifest.slug|1',
             'ArtisanBuild\BuiltForCloud\UiCredentialPurposes|built-for-cloud.ui.credential_purposes|1',
         ]),
-        'mcp_delegated' => [],
+        'mcp_delegated' => $sorted($delegatedTools),
     ];
 
     $report = (new FleetConformance($this))->assert(new ConsumerConformance(
@@ -129,9 +201,9 @@ it('passes the version 1 reference-consumer conformance spec', function (): void
         sourceRoots: $sourceRoots,
         providerFiles: $providerFiles,
         runtimeAssertions: ['auth_schema', 'credential_listing', 'meta', 'transport_parity'],
-        capabilities: ['credentials', 'tokens'],
+        capabilities: ['credentials', 'mcp-delegated', 'tokens'],
         purposeMappings: $purposeMappings,
-        mcpServer: null,
+        mcpServer: TelltaleMcpServer::class,
         expected: $expected,
     ));
 
