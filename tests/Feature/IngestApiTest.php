@@ -7,7 +7,9 @@ use App\Domain\Ingest\Credential;
 use App\Domain\Ingest\EventIngestor;
 use App\Domain\Ingest\IngestHealthRecorder;
 use App\Domain\Ingest\IngestRequestLimiter;
+use App\Exceptions\IngestRateExceeded;
 use App\Exceptions\InvalidIngestCredential;
+use App\Http\Middleware\EnforceIngestBodyLimit;
 use App\Models\Install;
 use App\Models\StoredEvent;
 use App\Models\TrackedApp;
@@ -19,10 +21,12 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @param  array{rate_per_minute?: int, install_rate_per_minute?: int, daily_event_cap?: int, install_daily_event_cap?: int}  $limits
@@ -279,6 +283,79 @@ it('bounds both compressed and decoded gzip bodies before credential lookup', fu
     expect(collect($queries)->contains(fn (string $query): bool => str_contains($query, 'installs')))->toBeFalse();
 });
 
+it('rejects a body that exceeds the limit regardless of its declared content length', function (): void {
+    config(['telltale.ingest.max_body_bytes' => 512]);
+
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'CONTENT_LENGTH' => 5,
+    ], content: str_repeat('x', 600))->assertStatus(413)->assertExactJson([
+        'message' => 'Request body is too large.',
+    ]);
+});
+
+it('accepts plain bodies exactly at the byte limit', function (): void {
+    config(['telltale.ingest.max_body_bytes' => 512]);
+
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+    ], content: str_repeat('x', 512))->assertUnauthorized();
+
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'CONTENT_LENGTH' => 512,
+    ], content: str_repeat('x', 512))->assertUnauthorized();
+});
+
+it('accepts gzip bodies whose decoded size is exactly the byte limit', function (): void {
+    [, $ingestValue] = createIngestApp();
+    $token = registerInstall($ingestValue)['install_token'];
+    $json = json_encode(ingestEnvelope([
+        ingestEvent(overrides: ['props' => ['payload' => '']]),
+    ]), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $padding = 512 - strlen($json);
+    $json = str_replace('"payload":""', '"payload":"'.str_repeat('y', $padding).'"', $json);
+    expect(strlen($json))->toBe(512);
+
+    $compressed = gzencode($json);
+    expect($compressed)->toBeString()
+        ->and(strlen($compressed))->toBeLessThan(512);
+
+    config(['telltale.ingest.max_body_bytes' => 512]);
+
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'CONTENT_LENGTH' => strlen($compressed),
+        'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        'HTTP_CONTENT_ENCODING' => 'gzip',
+    ], content: $compressed)->assertAccepted()
+        ->assertJson(['accepted' => 1, 'duplicates' => 0]);
+});
+
+it('accepts a one-byte maximum body limit as valid configuration', function (): void {
+    config(['telltale.ingest.max_body_bytes' => 1]);
+
+    $this->call('POST', '/api/register', server: [
+        'CONTENT_TYPE' => 'application/json',
+    ], content: 'x')->assertUnauthorized();
+});
+
+it('publishes the bounded body attribute for plain bodies', function (): void {
+    $request = Request::create('/api/ingest', 'POST', server: [
+        'CONTENT_TYPE' => 'application/json',
+    ], content: '{"ok":true}');
+    $captured = null;
+
+    (new EnforceIngestBodyLimit)->handle($request, function (Request $passed) use (&$captured): Response {
+        $captured = $passed;
+
+        return new Response;
+    });
+
+    expect($captured)->not->toBeNull()
+        ->and($captured?->attributes->get(EnforceIngestBodyLimit::BODY_ATTRIBUTE))->toBe('{"ok":true}');
+});
+
 it('rejects malformed and unsupported envelopes with actionable validation errors', function (): void {
     [, $ingestValue] = createIngestApp();
     $token = registerInstall($ingestValue)['install_token'];
@@ -417,6 +494,81 @@ it('enforces app and install daily volume while duplicates consume no volume', f
     ]))->assertTooManyRequests();
 
     expect(StoredEvent::query()->count())->toBe(2);
+});
+
+it('keeps minute-limit buckets scoped per IP app and install', function (): void {
+    config(['telltale.ingest.ip_rate_per_minute' => 1]);
+    $limiter = new IngestRequestLimiter(
+        new LaravelRateLimiter(Cache::store('array')),
+        resolve(IngestHealthRecorder::class),
+    );
+    $firstIp = Request::create('/api/ingest', 'POST', server: ['REMOTE_ADDR' => '203.0.113.10']);
+    $secondIp = Request::create('/api/ingest', 'POST', server: ['REMOTE_ADDR' => '203.0.113.11']);
+
+    $limiter->consumeIp($firstIp);
+
+    expect(fn (): bool => $limiter->consumeIp($firstIp) ?: true)->toThrow(IngestRateExceeded::class)
+        ->and(fn (): bool => $limiter->consumeIp($secondIp) ?: true)->not->toThrow(IngestRateExceeded::class);
+
+    [$firstApp] = createIngestApp(['rate_per_minute' => 1]);
+    [$secondApp] = createIngestApp(['rate_per_minute' => 1]);
+
+    $limiter->consumeApp($firstApp);
+
+    expect(fn (): bool => $limiter->consumeApp($firstApp) ?: true)->toThrow(IngestRateExceeded::class)
+        ->and(fn (): bool => $limiter->consumeApp($secondApp) ?: true)->not->toThrow(IngestRateExceeded::class);
+
+    [$sharedApp] = createIngestApp(['install_rate_per_minute' => 1]);
+
+    $limiter->consumeInstall($sharedApp, 'install-token-a');
+
+    expect(fn (): bool => $limiter->consumeInstall($sharedApp, 'install-token-a') ?: true)->toThrow(IngestRateExceeded::class)
+        ->and(fn (): bool => $limiter->consumeInstall($sharedApp, 'install-token-b') ?: true)->not->toThrow(IngestRateExceeded::class);
+});
+
+it('reports the remaining minute window as the retry delay', function (): void {
+    config(['telltale.ingest.ip_rate_per_minute' => 1]);
+
+    $this->postJson('/api/register', [])->assertUnauthorized();
+    $limited = $this->postJson('/api/register', [])->assertTooManyRequests();
+
+    expect((int) $limited->headers->get('Retry-After'))->toBeGreaterThanOrEqual(55)
+        ->toBeLessThanOrEqual(60);
+});
+
+it('reports the time until the daily window resets as the retry delay', function (): void {
+    Date::setTestNow(Date::parse('2026-10-17 12:00:00', 'UTC'));
+    [, $appLimitedValue] = createIngestApp(['daily_event_cap' => 1]);
+    $token = registerInstall($appLimitedValue)['install_token'];
+
+    $limited = $this->withToken($token)->postJson('/api/ingest', ingestEnvelope([
+        ingestEvent(),
+        ingestEvent('01ARZ3NDEKTSV4RRFFQ69G5FAW'),
+    ]))->assertTooManyRequests();
+
+    expect((int) $limited->headers->get('Retry-After'))->toBe(43_200);
+});
+
+it('accepts a batch that lands exactly on the daily caps and rejects the first event beyond them', function (): void {
+    [, $appLimitedValue] = createIngestApp(['daily_event_cap' => 2, 'install_daily_event_cap' => 10]);
+    $appToken = registerInstall($appLimitedValue)['install_token'];
+
+    $this->withToken($appToken)->postJson('/api/ingest', ingestEnvelope([
+        ingestEvent(),
+        ingestEvent('01ARZ3NDEKTSV4RRFFQ69G5FAW'),
+    ]))->assertAccepted();
+
+    $this->withToken($appToken)->postJson('/api/ingest', ingestEnvelope([
+        ingestEvent('01ARZ3NDEKTSV4RRFFQ69G5FAY'),
+    ]))->assertTooManyRequests();
+
+    [, $installLimitedValue] = createIngestApp(['daily_event_cap' => 10, 'install_daily_event_cap' => 1]);
+    $installToken = registerInstall($installLimitedValue)['install_token'];
+
+    $this->withToken($installToken)->postJson('/api/ingest', ingestEnvelope())->assertAccepted();
+    $this->withToken($installToken)->postJson('/api/ingest', ingestEnvelope([
+        ingestEvent('01ARZ3NDEKTSV4RRFFQ69G5FAZ'),
+    ]))->assertTooManyRequests();
 });
 
 it('fails closed without resolving a user when global protection configuration is invalid', function (): void {
