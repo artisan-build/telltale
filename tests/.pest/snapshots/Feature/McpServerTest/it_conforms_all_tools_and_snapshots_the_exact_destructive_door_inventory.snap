@@ -9,6 +9,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Apps",
             "readOnlyHint": true
         },
         "_meta": {
@@ -40,6 +41,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Ingest Health",
             "readOnlyHint": true
         },
         "_meta": {
@@ -90,6 +92,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Event Counts",
             "readOnlyHint": true
         },
         "_meta": {
@@ -119,6 +122,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Active Users",
             "readOnlyHint": true
         },
         "_meta": {
@@ -150,6 +154,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Release Adoption",
             "readOnlyHint": true
         },
         "_meta": {
@@ -187,6 +192,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Screen Flow",
             "readOnlyHint": true
         },
         "_meta": {
@@ -235,6 +241,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Funnel",
             "readOnlyHint": true
         },
         "_meta": {
@@ -266,6 +273,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Retention",
             "readOnlyHint": true
         },
         "_meta": {
@@ -297,6 +305,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Sessions",
             "readOnlyHint": true
         },
         "_meta": {
@@ -339,6 +348,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Errors",
             "readOnlyHint": true
         },
         "_meta": {
@@ -370,6 +380,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Error Detail",
             "readOnlyHint": true
         },
         "_meta": {
@@ -411,6 +422,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Install Timeline",
             "readOnlyHint": true
         },
         "_meta": {
@@ -446,6 +458,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Delete Install",
             "destructiveHint": true
         },
         "_meta": {
@@ -485,6 +498,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Revoke Install",
             "destructiveHint": true
         },
         "_meta": {
@@ -518,6 +532,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Rotate Ingest Key",
             "destructiveHint": true
         },
         "_meta": {
