@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 use App\Domain\Ingest\AppManager;
 use App\Domain\Ingest\Credential;
+use App\Domain\Ingest\EventIngestor;
 use App\Domain\Ingest\IngestHealthRecorder;
 use App\Domain\Ingest\IngestRequestLimiter;
+use App\Exceptions\InvalidIngestCredential;
 use App\Exceptions\IngestRateExceeded;
 use App\Http\Middleware\EnforceIngestBodyLimit;
 use App\Models\Install;
 use App\Models\StoredEvent;
 use App\Models\TrackedApp;
+use ArtisanBuild\TelltaleContracts\EnvelopeV1;
 use Illuminate\Cache\RateLimiter as LaravelRateLimiter;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +25,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -131,6 +137,23 @@ it('returns generic failures for missing malformed and revoked credentials', fun
         ->postJson('/api/register', ['install_id' => Install::query()->sole()->install_uuid])
         ->assertUnauthorized()
         ->assertExactJson(['message' => 'Invalid credentials.']);
+});
+
+it('rejects a token that does not belong to the resolved install', function (): void {
+    [$appA, $ingestA] = createIngestApp();
+    [, $ingestB] = createIngestApp();
+    $tokenA = registerInstall($ingestA)['install_token'];
+    $tokenB = registerInstall($ingestB)['install_token'];
+    $installA = Install::query()->where('app_id', $appA->id)->sole();
+
+    $envelope = EnvelopeV1::fromArray(ingestEnvelope());
+
+    expect(fn () => resolve(EventIngestor::class)->ingest($installA, $tokenB, $envelope))
+        ->toThrow(InvalidIngestCredential::class);
+
+    resolve(EventIngestor::class)->ingest($installA, $tokenA, $envelope);
+
+    expect(StoredEvent::query()->count())->toBe(1);
 });
 
 it('stores only credential-derived app and install identity', function (): void {
@@ -568,6 +591,140 @@ it('fails closed without resolving a user when global protection configuration i
 
         $this->postJson('/api/register', [])->assertServiceUnavailable();
     }
+});
+
+it('never resolves an auth guard and never reports during expected public failures', function (): void {
+    $spy = new class implements Guard
+    {
+        public int $resolutions = 0;
+
+        public function user(): ?Authenticatable
+        {
+            $this->resolutions++;
+
+            return null;
+        }
+
+        public function validate(array $credentials = []): bool
+        {
+            $this->resolutions++;
+
+            return false;
+        }
+
+        public function check(): bool
+        {
+            return $this->user() !== null;
+        }
+
+        public function hasUser(): bool
+        {
+            return false;
+        }
+
+        public function id(): ?int
+        {
+            return null;
+        }
+
+        public function guest(): bool
+        {
+            return true;
+        }
+
+        public function setUser(Authenticatable $user): void {}
+    };
+    Auth::extend('counting', fn (): Guard => $spy);
+    config([
+        'auth.defaults.guard' => 'counting',
+        'auth.guards.counting' => ['driver' => 'counting'],
+    ]);
+    $records = [];
+    $this->app->instance(LoggerInterface::class, new class($records) implements LoggerInterface
+    {
+        /** @param array<int, string> $records */
+        public function __construct(private array &$records) {}
+
+        public function emergency(string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+
+        public function alert(string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+
+        public function critical(string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+
+        public function error(string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+
+        public function warning(string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+
+        public function notice(string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+
+        public function info(string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+
+        public function debug(string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+
+        public function log(mixed $level, string|Stringable $message, array $context = []): void
+        {
+            $this->records[] = (string) $message;
+        }
+    });
+
+    config(['telltale.ingest.max_body_bytes' => 0, 'telltale.ingest.ip_rate_per_minute' => 240]);
+    $this->postJson('/api/register', [])->assertServiceUnavailable();
+
+    config(['telltale.ingest.max_body_bytes' => 1_048_576]);
+    $this->postJson('/api/register', ['install_id' => (string) Str::uuid()])->assertUnauthorized();
+
+    [, $ingestValue] = createIngestApp();
+    $this->postJson('/api/register', ['install_id' => 'not-a-uuid'], ['X-Telltale-Ingest' => $ingestValue])
+        ->assertUnprocessable();
+
+    config(['telltale.ingest.max_body_bytes' => 20]);
+    $this->call('POST', '/api/ingest', server: [
+        'CONTENT_TYPE' => 'application/json',
+        'CONTENT_LENGTH' => 21,
+    ], content: str_repeat('x', 21))->assertStatus(413);
+
+    config(['telltale.ingest.max_body_bytes' => 1_048_576, 'telltale.ingest.ip_rate_per_minute' => 1]);
+    $this->postJson('/api/register', ['install_id' => (string) Str::uuid()], ['X-Telltale-Ingest' => $ingestValue])
+        ->assertTooManyRequests();
+    RateLimiter::clear('telltale:ip:'.hash_hmac('sha256', '127.0.0.1', (string) config('app.key')));
+
+    config(['telltale.ingest.ip_rate_per_minute' => 240]);
+    [, $cappedValue] = createIngestApp(['daily_event_cap' => 1]);
+    $cappedToken = registerInstall($cappedValue)['install_token'];
+    $this->withToken($cappedToken)->postJson('/api/ingest', ingestEnvelope([
+        ingestEvent(),
+        ingestEvent('01ARZ3NDEKTSV4RRFFQ69G5FAW'),
+    ]))->assertTooManyRequests();
+
+    $this->withToken('ttx_'.str_repeat('a', 64))->postJson('/api/ingest', ingestEnvelope())
+        ->assertUnauthorized();
+
+    expect($spy->resolutions)->toBe(0)
+        ->and($records)->toBe([]);
 });
 
 it('persists no plaintext credentials or IP addresses', function (): void {
