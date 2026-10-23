@@ -175,6 +175,13 @@ it('accepts bounded error details at every upper limit', function (): void {
         ->toBe($error);
 });
 
+it('pins the error wire caps to their contract literals', function (): void {
+    expect(ErrorDetails::MAX_MESSAGE_LENGTH)->toBe(4096)
+        ->and(ErrorDetails::MAX_FILE_LENGTH)->toBe(1024)
+        ->and(ErrorDetails::MAX_STACK_FRAMES)->toBe(100)
+        ->and(ErrorDetails::MAX_STACK_FRAME_LENGTH)->toBe(2048);
+});
+
 it('accepts bounded error details at their lower limits', function (array $overrides): void {
     $event = validEvent(['type' => 'error', 'error' => validError($overrides)]);
 
@@ -184,6 +191,7 @@ it('accepts bounded error details at their lower limits', function (array $overr
     'one-byte file' => [['file' => 'f']],
     'empty stack' => [['stack' => []]],
     'empty frame' => [['stack' => ['']]],
+    'line one' => [['line' => 1]],
 ]);
 
 it('rejects error details over every cap', function (array $error): void {
@@ -207,9 +215,14 @@ it('rejects malformed error detail values', function (array $error): void {
     'zero line' => [validError(['line' => 0])],
     'non-integer line' => [validError(['line' => 1.5])],
     'stack is not a list' => [validError(['stack' => ['frame' => 'value']])],
+    'stack is not an array' => [validError(['stack' => 'boom'])],
     'stack contains non-string' => [validError(['stack' => [1]])],
     'empty fingerprint' => [validError(['fingerprint' => ''])],
     'null fingerprint' => [validError(['fingerprint' => null])],
+    'NUL in class' => [validError(['class' => "RuntimeException\0evil"])],
+    'NUL in fingerprint' => [validError(['fingerprint' => "runtime\0evil"])],
+    'invalid UTF-8 class' => [validError(['class' => "\xB1\x31"])],
+    'invalid UTF-8 fingerprint' => [validError(['fingerprint' => "\xB1\x31"])],
 ]);
 
 it('accepts property keys and strings at both caps', function (): void {
@@ -239,6 +252,55 @@ it('rejects property keys and strings over both caps recursively', function (arr
     'top-level string' => [['value' => str_repeat('v', Event::MAX_PROPERTY_STRING_LENGTH + 1)]],
     'nested string' => [['nested' => ['value' => str_repeat('v', Event::MAX_PROPERTY_STRING_LENGTH + 1)]]],
 ]);
+
+it('validates nested objects decoded from JSON recursively', function (array $nested): void {
+    $json = json_encode(
+        validEnvelope(['events' => [validEvent(['props' => ['nested' => $nested]])]]),
+        JSON_THROW_ON_ERROR,
+    );
+
+    EnvelopeV1::fromJson($json);
+})->throws(ContractException::class)->with([
+    'oversized key in object' => [[str_repeat('k', Event::MAX_PROPERTY_KEY_LENGTH + 1) => true]],
+    'oversized string in object' => [['value' => str_repeat('v', Event::MAX_PROPERTY_STRING_LENGTH + 1)]],
+    'NUL in object string' => [['value' => "text\0invalid"]],
+]);
+
+it('validates values inside nested JSON lists', function (mixed $child): void {
+    EnvelopeV1::fromArray(validEnvelope(['events' => [validEvent(['props' => ['values' => [$child]]])]]));
+})->throws(ContractException::class)->with([
+    'infinity in list' => [INF],
+    'oversized string in list' => [str_repeat('v', Event::MAX_PROPERTY_STRING_LENGTH + 1)],
+    // Only reachable via direct fromArray construction; wire input decodes lists without objects.
+    'object in list' => [new DateTimeImmutable],
+    'invalid UTF-8 in list' => ["\xB1\x31"],
+]);
+
+it('recursively normalizes nested containers in toArray', function (): void {
+    $event = new Event(
+        eventId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        name: 'checkout.completed',
+        type: EventType::Event,
+        timestamp: '2026-10-03T12:34:56.123Z',
+        sessionId: 'session-1',
+        props: [
+            'obj' => new stdClass,
+            'deep' => ['deeper' => new stdClass, 'list' => [new stdClass]],
+        ],
+    );
+
+    expect($event->toArray()['props'])->toBe([
+        'obj' => [],
+        'deep' => ['deeper' => [], 'list' => [[]]],
+    ]);
+});
+
+it('pins the event wire caps to their contract literals', function (): void {
+    expect(Event::MAX_NAME_LENGTH)->toBe(255)
+        ->and(Event::MAX_SESSION_ID_LENGTH)->toBe(255)
+        ->and(Event::MAX_PROPERTY_KEY_LENGTH)->toBe(128)
+        ->and(Event::MAX_PROPERTY_STRING_LENGTH)->toBe(4096);
+});
 
 it('rejects non-finite and non-JSON property values', function (mixed $value): void {
     EnvelopeV1::fromArray(validEnvelope(['events' => [validEvent(['props' => ['value' => $value]])]]));
@@ -289,6 +351,26 @@ it('rejects invalid client versions', function (mixed $version): void {
     'invalid UTF-8' => ["\xB1\x31"],
     'overlong' => [str_repeat('v', EnvelopeV1::MAX_CLIENT_VERSION_LENGTH + 1)],
 ]);
+
+it('rejects non-Event members in the typed events list', function (): void {
+    $event = Event::fromArray(validEvent());
+
+    expect(fn () => new EnvelopeV1('1.2.3', 0, [$event, 'not-an-event']))
+        ->toThrow(ContractException::class);
+});
+
+it('emits unescaped slashes in the v1 JSON wire format', function (): void {
+    $envelope = EnvelopeV1::fromArray(validEnvelope([
+        'events' => [validEvent(['props' => ['url' => 'https://example.com/a/b']])],
+    ]));
+
+    expect($envelope->toJson())->toContain('"https://example.com/a/b"');
+});
+
+it('pins the envelope wire constants to their contract literals', function (): void {
+    expect(EnvelopeV1::VERSION)->toBe(1)
+        ->and(EnvelopeV1::MAX_CLIENT_VERSION_LENGTH)->toBe(255);
+});
 
 it('never admits identity or credential fields into the body', function (): void {
     $payload = validEnvelope([
