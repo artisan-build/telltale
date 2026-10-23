@@ -38,7 +38,7 @@ it('serves an honest public landing without management state and protects packag
         ->assertDontSee($app->ingest_key_hash);
 
     $this->get('/dashboard')->assertRedirect(route('bfc.login', ['intended' => '/dashboard']));
-    $this->get('/setup')->assertRedirect(route('bfc.login'));
+    $this->get('/setup')->assertRedirect(route('bfc.login', ['intended' => '/setup']));
 });
 
 it('creates and rotates through the existing manager and reveals each plaintext value only in its response', function (): void {
