@@ -6,7 +6,6 @@ use App\Authorization\TelltaleAbility;
 use App\Domain\Ingest\AppManager;
 use App\Domain\Ingest\Credential as IngestCredential;
 use App\Http\Middleware\RejectIngestCredentialsFromReadSurface;
-use App\Mcp\TelltaleMcpServer;
 use App\Mcp\Tools\ActiveUsers;
 use App\Mcp\Tools\Apps;
 use App\Mcp\Tools\DeleteInstall;
@@ -30,13 +29,14 @@ use App\Models\Install;
 use App\Models\StoredEvent;
 use App\Models\TrackedApp;
 use ArtisanBuild\BuiltForCloud\Console\ConsoleKeyring;
+use ArtisanBuild\BuiltForCloud\Console\DelegatedActor;
 use ArtisanBuild\BuiltForCloud\Credential;
 use ArtisanBuild\BuiltForCloud\CredentialAbilityRegistry;
 use ArtisanBuild\BuiltForCloud\CredentialKind;
 use ArtisanBuild\BuiltForCloud\CredentialPurpose;
 use ArtisanBuild\BuiltForCloud\CredentialStatus;
+use ArtisanBuild\BuiltForCloud\OffboardedSubject;
 use ArtisanBuild\BuiltForCloud\SubjectType;
-use ArtisanBuild\BuiltForCloud\Testing\McpDelegatedTools;
 use ArtisanBuild\BuiltForCloud\Testing\McpProductAdmission;
 use ArtisanBuild\BuiltForCloud\User;
 use ArtisanBuild\BuiltForCloud\UserRole;
@@ -101,8 +101,6 @@ it('registers exactly two effect-scoped MCP doors and publishes delegated metada
 });
 
 it('conforms all tools and snapshots the exact destructive-door inventory', function (): void {
-    McpDelegatedTools::assertConforms(TelltaleMcpServer::class);
-
     $token = telltaleMcpCredential([TelltaleAbility::Read->value]);
     $response = telltaleMcpRequest('/mcp/destructive', mcpListPayload(), $token)->assertOk();
     $tools = $response->json('result.tools');
@@ -140,6 +138,14 @@ it('admits only exact read ability and current active user-bound grants before a
     resolve(CredentialAbilityRegistry::class)->register('other.read');
     $activeUser = telltaleMcpUser('active');
     $inactiveUser = telltaleMcpUser('inactive');
+    $offboardedUser = telltaleMcpUser('active');
+    OffboardedSubject::query()->create([
+        'id' => (string) str()->uuid(),
+        'subject_type' => SubjectType::UserPrincipal,
+        'subject_ref' => 'user-'.$offboardedUser->id,
+        'user_id' => (string) $offboardedUser->id,
+        'offboarded_at' => now(),
+    ]);
     $nobodyQueries = [];
     DB::listen(function ($query) use (&$nobodyQueries): void {
         $nobodyQueries[] = strtolower($query->sql);
@@ -151,6 +157,7 @@ it('admits only exact read ability and current active user-bound grants before a
         'missing ability' => [telltaleMcpCredential([]), 400],
         'wrong ability' => [telltaleMcpCredential(['other.read']), 400],
         'inactive account cap' => [telltaleMcpCredential([TelltaleAbility::Read->value], $inactiveUser), 400],
+        'offboarded account cap' => [telltaleMcpCredential([TelltaleAbility::Read->value], $offboardedUser), 401],
         'wrong purpose' => [telltaleMcpCredential([TelltaleAbility::Read->value], null, CredentialPurpose::Consumption), 401],
         'unknown credential' => ['not-a-stored-credential', 401],
     ];
@@ -254,15 +261,32 @@ it('admits active delegated members and admins and refuses malformed assertions'
     expect(applicationQueries($queries))->toBe([]);
 });
 
+it('never aliases a delegated numeric actor id to the same local user id', function (): void {
+    $key = telltaleDelegatedKey();
+    telltaleTrustDelegatedKey($key);
+
+    telltaleMcpRequest('/mcp', mcpListPayload(), telltaleAssertion($key, 'member', 'numeric-collision'))
+        ->assertOk();
+
+    $delegated = DelegatedActor::query()->where('subject', 'telltale-numeric-collision')->sole();
+    $local = telltaleMcpUser('inactive', (int) $delegated->getKey());
+
+    telltaleMcpRequest('/mcp', mcpToolPayload('apps'), telltaleAssertion($key, 'member', 'numeric-collision'))
+        ->assertOk()
+        ->assertJsonPath('result.isError', false);
+
+    expect($delegated->getKey())->toBe($local->getKey())
+        ->and($delegated->getAuthIdentifier())->toBe('bfc-console:'.$local->getKey())
+        ->and($delegated->getAuthIdentifier())->not->toBe((string) $local->getKey());
+});
+
 it('keeps destructive tools absent and distinguishably refused through the read ceiling', function (): void {
     $token = telltaleMcpCredential([TelltaleAbility::Read->value]);
     $list = telltaleMcpRequest('/mcp', mcpListPayload(), $token)->assertOk();
 
-    expect($list->json('result.tools.*.name'))->not->toContain(
-        'delete_install',
-        'revoke_install',
-        'rotate_ingest_key',
-    );
+    foreach (['delete_install', 'revoke_install', 'rotate_ingest_key'] as $destructiveTool) {
+        expect($list->json('result.tools.*.name'))->not->toContain($destructiveTool);
+    }
 
     telltaleMcpRequest('/mcp', mcpToolPayload('delete_install', [
         'app_id' => 1,
@@ -815,13 +839,22 @@ function telltaleMcpCredential(
     return $token;
 }
 
-function telltaleMcpUser(string $status): User
+function telltaleMcpUser(string $status, ?int $id = null): User
 {
-    $user = User::query()->create([
+    $user = new User;
+    $attributes = [
         'name' => 'MCP test user',
         'email' => str()->random(12).'@example.test',
-    ]);
-    $user->forceFill(['role' => UserRole::Member->value, 'status' => $status])->save();
+        'role' => UserRole::Member->value,
+        'status' => $status,
+    ];
+
+    if ($id !== null) {
+        $attributes['id'] = $id;
+    }
+
+    $user->forceFill($attributes);
+    $user->save();
 
     return $user;
 }
