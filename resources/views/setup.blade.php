@@ -3,13 +3,11 @@
 @endpush
 
 <x-bfc-layout title="Telltale setup">
-<div class="mx-auto grid max-w-4xl gap-8">
-    <nav data-testid="product-navigation" class="bfc-nav">
-        <a href="{{ route('bfc.dashboard') }}">Apps</a>
-        <a href="{{ route('telltale.setup') }}" aria-current="page">Setup</a>
-        <a href="{{ route('bfc.ui.home') }}">Account settings</a>
-    </nav>
+    <x-slot:sidebar>
+        @include('partials.product-navigation', ['active' => 'setup'])
+    </x-slot:sidebar>
 
+<div class="mx-auto grid max-w-4xl gap-8">
     <header data-testid="setup-introduction" class="grid gap-4">
         <p class="text-sm font-semibold uppercase tracking-widest text-clay-muted">NativePHP integration</p>
         <h1 class="font-display text-4xl font-normal tracking-tight text-clay-ink sm:text-5xl">Set up Telltale in this order</h1>

@@ -3,6 +3,32 @@
 @endpush
 
 <x-bfc-layout title="Telltale apps">
+    <x-slot:sidebar>
+        <div class="grid gap-3">
+            @include('partials.product-navigation', ['active' => 'apps'])
+
+            <section data-testid="app-list" class="grid gap-3">
+                <h2 class="font-display text-2xl font-normal text-clay-ink">Select an app</h2>
+                @if ($apps === [])
+                    <p class="text-sm leading-6 text-clay-soft">No apps yet. Create your first app to get started.</p>
+                @else
+                    <nav aria-label="Telltale apps" class="grid gap-2">
+                        @foreach ($apps as $app)
+                            <a href="{{ route('telltale.apps.show', $app['id']) }}"
+                               @if ($selected?->id === $app['id']) aria-current="page" @endif
+                               class="bfc-shell-link {{ $selected?->id === $app['id'] ? 'text-clay-ink' : 'text-clay-soft' }}">
+                                <span>
+                                    <strong class="block text-clay-ink">{{ $app['name'] }}</strong>
+                                    <span>{{ $app['last_seen_at'] === null ? 'No retained events' : 'Latest retained event '.$app['last_seen_at'] }}</span>
+                                </span>
+                            </a>
+                        @endforeach
+                    </nav>
+                @endif
+            </section>
+        </div>
+    </x-slot:sidebar>
+
 <div class="grid gap-8 lg:grid-cols-[18rem_1fr]">
     <aside class="grid content-start gap-6">
         <section data-testid="app-create" class="bfc-panel grid gap-4">
@@ -22,32 +48,9 @@
                 <button type="submit" class="bfc-button w-fit">Create app</button>
             </form>
         </section>
-
-        <section data-testid="app-list" class="bfc-panel grid gap-3">
-            <h2 class="font-display text-2xl font-normal text-clay-ink">Select an app</h2>
-            @if ($apps === [])
-                <p class="text-sm leading-6 text-clay-soft">No apps yet. Create the first app above.</p>
-            @else
-                <nav aria-label="Telltale apps" class="grid gap-2">
-                    @foreach ($apps as $app)
-                        <a href="{{ route('telltale.apps.show', $app['id']) }}"
-                           class="rounded-xl border px-4 py-3 text-sm transition {{ $selected?->id === $app['id'] ? 'border-clay-iron bg-clay-slip text-clay-ink' : 'border-clay-edge bg-clay-surface text-clay-soft hover:border-clay-dot' }}">
-                            <strong class="block text-clay-ink">{{ $app['name'] }}</strong>
-                            <span>{{ $app['last_seen_at'] === null ? 'No retained events' : 'Latest retained event '.$app['last_seen_at'] }}</span>
-                        </a>
-                    @endforeach
-                </nav>
-            @endif
-        </section>
     </aside>
 
     <section class="grid content-start gap-6">
-        <nav data-testid="product-navigation" class="bfc-nav">
-            <a href="{{ route('bfc.dashboard') }}" aria-current="page">Apps</a>
-            <a href="{{ route('telltale.setup') }}">Setup</a>
-            <a href="{{ route('bfc.ui.home') }}">Account settings</a>
-        </nav>
-
         @if ($ingestValue !== null)
             <section data-testid="credential-reveal" class="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 shadow-sm">
                 <p class="text-sm font-semibold uppercase tracking-widest">{{ $credentialAction === 'created' ? 'App created' : 'Ingest value rotated' }}</p>

@@ -122,7 +122,12 @@ it('keeps app and recent health reads scoped and bounded with truthful empty sta
             'Latest retained event',
             'No retained events',
         )
-        ->not->toContain('8765', '5678', '7654', 'client-00', 'Last ingest', 'No ingest yet')
+        ->not->toContain('8765')
+        ->not->toContain('5678')
+        ->not->toContain('7654')
+        ->not->toContain('client-00')
+        ->not->toContain('Last ingest')
+        ->not->toContain('No ingest yet')
         ->and(substr_count($content, 'client-'))->toBe(25);
 
     TrackedApp::query()->delete();
@@ -143,6 +148,48 @@ it('returns validation errors for invalid UTF-8 app names', function (): void {
         ]);
 
     expect(TrackedApp::query()->count())->toBe(0);
+});
+
+it('places product and applicable app navigation in the sidebar without duplicate links', function (): void {
+    signIntoPackageUi($this);
+    $first = TrackedApp::factory()->create(['name' => 'Sidebar first app']);
+    $second = TrackedApp::factory()->create(['name' => 'Sidebar selected app']);
+
+    foreach ([
+        ['/dashboard', 'bfc.dashboard', $first],
+        [route('telltale.apps.show', $second), 'bfc.dashboard', $second],
+        ['/setup', 'telltale.setup', null],
+    ] as [$path, $activeRoute, $selected]) {
+        $html = $this->get($path)->assertOk()->getContent();
+        $document = new DOMDocument;
+        $document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new DOMXPath($document);
+        $sidebar = '//*[@data-testid="bfc-sidebar-slot"]';
+        $productNav = $sidebar.'//*[@data-testid="product-navigation"]';
+
+        expect($xpath->query($productNav)->length)->toBe(1);
+
+        foreach (['bfc.dashboard', 'telltale.setup', 'bfc.ui.home'] as $route) {
+            $link = '//a[@href="'.route($route).'"]';
+            expect($xpath->query($productNav.$link)->length)->toBe(1)
+                ->and($xpath->query($link)->length)->toBe(1);
+        }
+
+        expect($xpath->query($productNav.'//a[@aria-current="page"]')->length)->toBe(1)
+            ->and($xpath->query($productNav.'//a[@href="'.route($activeRoute).'" and @aria-current="page"]')->length)->toBe(1);
+
+        if ($selected !== null) {
+            $appList = $sidebar.'//*[@data-testid="app-list"]';
+            foreach ([$first, $second] as $app) {
+                $link = '//a[@href="'.route('telltale.apps.show', $app).'"]';
+                expect($xpath->query($appList.$link)->length)->toBe(1)
+                    ->and($xpath->query($link)->length)->toBe(1)
+                    ->and($xpath->query($appList.$link)->item(0)->textContent)->toContain($app->name);
+            }
+            expect($xpath->query($appList.'//a[@aria-current="page"]')->length)->toBe(1)
+                ->and($xpath->query($appList.'//a[@href="'.route('telltale.apps.show', $selected).'" and @aria-current="page"]')->length)->toBe(1);
+        }
+    }
 });
 
 it('caps the app list at one hundred rows', function (): void {
