@@ -25,10 +25,10 @@ background mobile uploads, session replay, feature flags, and a chart dashboard 
 
 ## Client Installation
 
-The client and contracts packages are published on Packagist at v1.0.0. The published client requires
-Laravel 13; support for Laravel 11 and 12 is already on `main` and will be included in the next release.
+The client is published on Packagist at v1.1.0 and supports Laravel 11, 12, and 13 on PHP 8.4 or newer.
+It requires the `ext-json`, `ext-sqlite3`, and `ext-zlib` PHP extensions in the NativePHP build environment.
 
-Install the client in a Laravel 13 NativePHP application:
+Install the client in a compatible NativePHP application:
 
 ```bash
 composer require artisan-build/telltale-client
