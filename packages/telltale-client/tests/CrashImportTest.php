@@ -6,6 +6,7 @@ use ArtisanBuild\TelltaleClient\Contracts\TelltaleClient;
 use ArtisanBuild\TelltaleClient\CrashImportOutcome;
 use ArtisanBuild\TelltaleClient\NullTelltaleClient;
 use ArtisanBuild\TelltaleClient\Storage\ClientDatabase;
+use ArtisanBuild\TelltaleClient\Testing\TelltaleFake;
 use ArtisanBuild\TelltaleContracts\CrashDetails;
 use ArtisanBuild\TelltaleContracts\CrashFrame;
 use Illuminate\Support\Facades\Http;
@@ -120,3 +121,78 @@ it('never acknowledges unavailable client storage', function (): void {
     expect(app(TelltaleClient::class)->importCrash(importedCrash()))->toBe(CrashImportOutcome::Retry)
         ->and($database->outboxCount())->toBe(0);
 });
+
+it('preserves historical dotted versions and numeric builds while scrubbing crash free text', function (string $version, string $build): void {
+    Http::fake();
+    $data = importedCrash()->toArray();
+    $data['app_version'] = $version;
+    $data['build'] = $build;
+    $data['frames'][0]['binary_name'] = 'person@example.test';
+    $crash = CrashDetails::fromArray($data);
+    $client = app(TelltaleClient::class);
+    $client->beforeSend(function (array $event): array {
+        $event['name'] = 'crash person@example.test';
+
+        return $event;
+    });
+
+    expect($client->importCrash($crash))->toBe(CrashImportOutcome::Enqueued);
+    $event = app(ClientDatabase::class)->batch(1)[0]->event;
+    expect($event['crash']['app_version'])->toBe($version)
+        ->and($event['crash']['build'])->toBe($build)
+        ->and($event['event_id'])->toBe($crash->eventId())
+        ->and($event['crash']['report_id'])->toBe($crash->reportId)
+        ->and($event['crash']['frames'][0]['binary_uuid'])->toBe('1234567890123456')
+        ->and($event['crash']['frames'][0]['address'])->toBe('0x1234567890123456')
+        ->and($event['crash']['frames'][0]['offset'])->toBe('0x12345678')
+        ->and($event['crash']['frames'][0]['load_address'])->toBe($crash->frames[0]->loadAddress)
+        ->and($event['crash']['reason'])->toBe('native_crash')
+        ->and($event['name'])->toBe('crash [redacted-email]')
+        ->and($event['crash']['frames'][0]['binary_name'])->toBe('[redacted-email]')
+        ->and($event['crash']['frames'][0]['symbol'])->toBe('frame [redacted-email] [redacted-phone]')
+        ->and($event['crash']['trace'])->toBe('[redacted-email] [redacted-phone]')
+        ->and($event['crash']['metadata']['note'])->toBe('[redacted-email]');
+    foreach (['person@example.test', '212 555 1212'] as $canary) {
+        expect(json_encode($event, JSON_THROW_ON_ERROR))->not->toContain($canary);
+    }
+    Http::assertNothingSent();
+})->with([
+    'calendar version and numeric build' => ['2026.10.30', '123456789'],
+    'dotted version and longVersionCode' => ['1.2.345678', '4294967295'],
+]);
+
+it('reports explicit fake crash import outcomes without acknowledging callback failures', function (string $mode, CrashImportOutcome $outcome): void {
+    $fake = new TelltaleFake;
+    $callbackCalls = 0;
+    $fake->beforeSend(function (array $event) use ($mode, &$callbackCalls): ?array {
+        $callbackCalls++;
+        if ($mode === 'throw') {
+            throw new RuntimeException('fake callback failure');
+        }
+        if ($mode === 'drop') {
+            return null;
+        }
+        $event['props']['note'] = 'accepted callback';
+
+        return $event;
+    });
+    if ($mode === 'opt-out') {
+        $fake->optOut();
+    }
+
+    $actual = $fake->importCrash(importedCrash());
+    expect($actual)->toBe($outcome)
+        ->and($actual->mayAcknowledge())->toBe($mode !== 'throw')
+        ->and($callbackCalls)->toBe($mode === 'opt-out' ? 0 : 1);
+    if ($mode === 'accept') {
+        $fake->assertEventSent('native_crash', fn (array $props): bool => $props['note'] === 'accepted callback'
+            && $props['crash']['report_id'] === importedCrash()->reportId);
+    } else {
+        $fake->assertNothingSent();
+    }
+})->with([
+    'accepted' => ['accept', CrashImportOutcome::Enqueued],
+    'deliberate drop' => ['drop', CrashImportOutcome::Dropped],
+    'callback throw' => ['throw', CrashImportOutcome::Retry],
+    'opt-out' => ['opt-out', CrashImportOutcome::Dropped],
+]);

@@ -121,10 +121,12 @@ enum CrashProjection {
         return report
     }
 
-    static func exits(_ data: Data, build: String? = nil, multipleVersions: Bool? = nil) -> [[String: Any]] {
+    static func exits(_ data: Data, start: String? = nil, end: String? = nil,
+                      build: String? = nil, multipleVersions: Bool? = nil) -> [[String: Any]] {
         guard data.count <= maxSourceBytes,
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let (start, end) = window(root),
+              let (start, end) = window(["timeStampBegin": start ?? root["timeStampBegin"] as? String ?? "",
+                                         "timeStampEnd": end ?? root["timeStampEnd"] as? String ?? ""]),
               let exits = root["applicationExitMetrics"] as? [String: Any] else { return [] }
         let metadata = root["metaData"] as? [String: Any] ?? [:]
         let mixed = multipleVersions ?? root["includesMultipleApplicationVersions"] as? Bool ?? false

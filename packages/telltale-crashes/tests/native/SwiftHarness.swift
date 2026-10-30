@@ -38,6 +38,21 @@ enum SwiftHarness {
         expect(aggregates.allSatisfy { $0["fatal"] as? Bool == true && $0["occurred_at"] as? String == end }, "exit fatal window attribution")
         expect(aggregates.allSatisfy { $0["reporting_window_start"] as? String == start }, "exit start retained")
         expect(CrashProjection.exits(exits, multipleVersions: true).allSatisfy { $0["build"] == nil && $0["app_version"] == nil }, "mixed-version exit cannot borrow latest build")
+        // Synthetic display-form JSON dates: typed MetricKit windows must own attribution.
+        var displayDates = try JSONSerialization.jsonObject(with: exits) as! [String: Any]
+        displayDates["timeStampBegin"] = "2020-10-27 14:59:00 +0000"
+        displayDates["timeStampEnd"] = "2020-10-28 14:59:00 +0000"
+        let typedStart = CrashProjection.timestamp(CrashProjection.date(start)!)
+        let typedEnd = CrashProjection.timestamp(CrashProjection.date(end)!)
+        let typedAggregates = CrashProjection.exits(CrashProjection.json(displayDates)!, start: typedStart, end: typedEnd)
+        expect(typedAggregates.count == 4, "typed window admits positive exits despite non-ISO JSON dates")
+        expect(typedAggregates.allSatisfy { $0["reporting_window_start"] as? String == typedStart
+            && $0["reporting_window_end"] as? String == typedEnd
+            && $0["occurred_at"] as? String == typedEnd }, "typed canonical window and occurrence preserved")
+        expect(typedAggregates.map { $0["occurrence_count"] as! UInt64 }.sorted() == [1, 2, 3, 4], "typed-window exit counts preserved")
+        let typedReference = CrashProjection.exits(exits, start: typedStart, end: typedEnd)
+        expect(typedAggregates.map { $0["report_id"] as! String } == typedReference.map { $0["report_id"] as! String }, "typed-window identity independent of raw JSON date format")
+        expect(typedAggregates.allSatisfy { $0["fatal"] as? Bool == true && $0["build"] as? String == typedReference[0]["build"] as? String }, "typed-window fatal and historical build preserved")
         var zero = try JSONSerialization.jsonObject(with: exits) as! [String: Any]
         zero["applicationExitMetrics"] = ["foregroundExitData": ["cumulativeMemoryResourceLimitExitCount": 0, "cumulativeAppWatchdogExitCount": 0],
                                           "backgroundExitData": ["cumulativeMemoryPressureExitCount": 0]]

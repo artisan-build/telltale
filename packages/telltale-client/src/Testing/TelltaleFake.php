@@ -93,10 +93,18 @@ final class TelltaleFake implements TelltaleClient
             return CrashImportOutcome::Dropped;
         }
 
-        $count = count($this->events);
-        $this->event('native_crash', ['crash' => $crash->toArray()]);
+        try {
+            $event = ['name' => 'native_crash', 'props' => ['crash' => $crash->toArray()]];
+            $event = $this->beforeSend === null ? $event : ($this->beforeSend)($event);
+            if ($event === null || ! is_string($event['name'] ?? null) || ! is_array($event['props'] ?? null)) {
+                return CrashImportOutcome::Dropped;
+            }
+            $this->events[] = ['name' => $event['name'], 'props' => $event['props']];
 
-        return count($this->events) > $count ? CrashImportOutcome::Enqueued : CrashImportOutcome::Dropped;
+            return CrashImportOutcome::Enqueued;
+        } catch (Throwable) {
+            return CrashImportOutcome::Retry;
+        }
     }
 
     public function report(Throwable $exception, string $source, array $props = []): void

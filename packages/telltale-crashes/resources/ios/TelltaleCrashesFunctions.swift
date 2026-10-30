@@ -67,7 +67,10 @@ final class TelltaleMetricSubscriber: NSObject, MXMetricManagerSubscriber {
         TelltaleCrashesFunctions.runtime.collect {
             payloads.prefix(32).flatMap { payload in
                 let source = payload.jsonRepresentation()
-                return CrashProjection.exits(source, build: payload.metaData?.applicationBuildVersion,
+                return CrashProjection.exits(source,
+                                             start: CrashProjection.timestamp(payload.timeStampBegin),
+                                             end: CrashProjection.timestamp(payload.timeStampEnd),
+                                             build: payload.metaData?.applicationBuildVersion,
                                              multipleVersions: payload.includesMultipleApplicationVersions)
                     .map { (report: $0, source: source, currentProcess: false) }
             }

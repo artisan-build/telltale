@@ -47,7 +47,7 @@ final class Privacy
     private static function crash(array $crash): array
     {
         // Structural IDs, timestamps, UUIDs/build IDs and canonical hex are not free text.
-        foreach (['reason' => 255, 'app_version' => 255, 'build' => 255, 'trace' => 16384] as $key => $limit) {
+        foreach (['reason' => 255, 'trace' => 16384] as $key => $limit) {
             if (isset($crash[$key]) && is_string($crash[$key])) {
                 $crash[$key] = self::text($crash[$key], $limit);
             }
