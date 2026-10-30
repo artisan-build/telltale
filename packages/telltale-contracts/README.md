@@ -64,3 +64,51 @@ Install tokens are header-only credentials. Ingest values or keys, app IDs, and 
 members of the envelope or event body. Unknown fields with those names are ignored during decoding
 and are never emitted during encoding. Runtime transport, authentication, and persistence are
 outside this package.
+
+## Envelope v2 and mobile crashes
+
+`EnvelopeV2` uses the same headers and ordinary event fields as v1. It adds `type: "crash"`
+with required typed `CrashDetails` in the event's `crash` field. A batch may mix ordinary and
+crash events. Error and crash details are mutually exclusive. V1 rejects crashes, and its
+ordinary JSON encoding is unchanged. Existing `Event` constructor calls still work; `crash`
+is an optional final argument.
+
+```php
+use ArtisanBuild\TelltaleContracts\EnvelopeDecoder;
+use ArtisanBuild\TelltaleContracts\EnvelopeV2;
+
+$envelope = EnvelopeDecoder::decode($json); // EnvelopeV1 or EnvelopeV2
+if ($envelope instanceof EnvelopeV2) {
+    foreach ($envelope->events as $event) {
+        if ($event->crash !== null) {
+            $fingerprint = $event->crash->fingerprint(); // Recompute on the server.
+            $retryEventId = $event->crash->eventId();
+        }
+    }
+}
+```
+
+Crash schema 1 requires a lowercase SHA-256 `report_id`, platform, kind, source, machine reason,
+fatal flag, occurrence timestamp, timestamp precision and positive occurrence count (at most
+1,000,000). Event `ts` equals `occurred_at`. Window-end timestamps require both reporting-window
+endpoints and equal the end. Optional app version/build describe the crashed build; unknown
+values are omitted. MetricKit hangs are nonfatal, while Android ApplicationExitInfo ANR deaths
+are fatal. Other accepted crash, memory-exit and watchdog-exit reports are fatal.
+
+`CrashFrame` retains binary UUID/build ID, name, address, offset, load address and symbol inputs.
+Addresses are canonical unsigned 64-bit hex strings, with precision-safe subtraction to derive
+relative/load addresses where inputs permit. Fingerprints use platform/kind/reason and up to five
+frames, preferring UUID plus offset for native frames and class/method symbols for JVM frames.
+They exclude absolute ASLR addresses and trace/exception messages. Empty frames use a
+platform/kind/reason fallback. `eventId()` converts the first 128 digest bits to a stable canonical
+ULID for retries; it does not encode the occurrence time.
+
+The limits are 64 frames, 255-byte binary text, 1,024-byte symbols, 16,384-byte sanitized UTF-8
+trace text and 16 scalar metadata keys (strings at most 1,024 bytes). Unknown crash/frame keys,
+opaque tombstone/base64 fields, binary text, invalid types and contradictory values throw
+`ContractException`. Native projection and privacy callbacks must remove sensitive text before
+import. This package does not parse native tombstones, upload reports, or trust body app identity.
+
+The [mobile crash contract](https://github.com/artisan-build/telltale/blob/main/docs/crash-contract.md)
+specifies the field rules, native handoff/acknowledgment, retention, byte-bounded delivery and
+planned server/MCP behavior. Those delivery paths are not implemented by the contracts package.
