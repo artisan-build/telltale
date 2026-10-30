@@ -128,7 +128,7 @@ and [bundle placement rules](https://developer.apple.com/documentation/bundleres
 
 ## Verification and release gates
 
-The committed Swift checkpoint passed a Foundation parser/store/runtime harness with 95 assertions
+The committed Swift checkpoint passed a Foundation parser/store/runtime harness with 100 assertions
 and an iOS SDK typecheck of the actual adapter using narrow NativePHP bridge stubs. Its generated
 iOS projection passed a PHP SQLite outbox and HTTP-fake envelope test (48 assertions). These are
 harness checks. They do not establish MetricKit delivery on a device; the simulator does not deliver
