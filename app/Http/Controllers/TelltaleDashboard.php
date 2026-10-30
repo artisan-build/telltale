@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Domain\Analytics\McpAnalytics;
 use App\Domain\Ingest\AppManager;
 use App\Models\TrackedApp;
+use ArtisanBuild\BuiltForCloud\View\AgentPrompts;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -19,9 +20,17 @@ final readonly class TelltaleDashboard
         private McpAnalytics $analytics,
     ) {}
 
-    public function __invoke(): View
+    /**
+     * Setup until any app has reported in, because that is the one thing to do
+     * first; agent prompts from then on, since Telltale answers through MCP.
+     */
+    public function __invoke(SetupController $setup, AgentPrompts $prompts): View
     {
-        return $this->render();
+        if (! TrackedApp::query()->whereHas('installs')->exists()) {
+            return app()->call($setup);
+        }
+
+        return view('agent-dashboard', ['prompts' => $prompts->all()]);
     }
 
     public function show(TrackedApp $app): View

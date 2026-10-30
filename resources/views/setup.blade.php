@@ -1,11 +1,4 @@
-@push('head')
-    <link rel="stylesheet" href="{{ asset('build/assets/app.css') }}">
-@endpush
-
-<x-bfc-layout title="Telltale setup">
-    <x-slot:sidebar>
-        @include('partials.product-navigation', ['active' => 'setup'])
-    </x-slot:sidebar>
+<x-telltale-layout title="Telltale setup" active="setup">
 
 <div class="mx-auto grid max-w-4xl gap-8">
     <header data-testid="setup-introduction" class="grid gap-4">
@@ -23,6 +16,19 @@
                     <p class="mt-2 leading-7 text-clay-soft">{{ $step['body'] }}</p>
                     @if ($step['code'] !== null)
                         <pre class="mt-4 overflow-x-auto rounded-xl bg-clay-ink p-4 text-sm text-clay-surface"><code>{{ $step['code'] }}</code></pre>
+                    @endif
+                    @if ($step['creates_app'] ?? false)
+                        <form method="POST" action="{{ route('telltale.apps.store') }}" class="mt-4 grid gap-3" data-testid="app-create">
+                            @csrf
+                            <label for="app-name" class="text-sm font-semibold text-clay-ink">App name</label>
+                            <div class="flex flex-col gap-3 sm:flex-row">
+                                <input id="app-name" name="name" value="{{ old('name') }}" required maxlength="255" autocomplete="off" class="min-h-12 w-full rounded-2xl border border-clay-edge bg-clay-slip px-4 py-3 text-base text-clay-ink shadow-clay-inset focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-clay-iron">
+                                <button type="submit" class="bfc-button shrink-0">Create app</button>
+                            </div>
+                            @error('name')
+                                <p class="text-sm text-red-700">{{ $message }}</p>
+                            @enderror
+                        </form>
                     @endif
                 </div>
             </li>
@@ -45,4 +51,4 @@
         <p class="text-sm text-clay-muted">See <code>docs/privacy.md</code> and <code>docs/data-reference.md</code> in the Telltale repository.</p>
     </section>
 </div>
-</x-bfc-layout>
+</x-telltale-layout>
