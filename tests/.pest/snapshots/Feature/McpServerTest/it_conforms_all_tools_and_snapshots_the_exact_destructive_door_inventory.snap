@@ -389,6 +389,112 @@
         }
     },
     {
+        "name": "crash_groups",
+        "title": "Crash Groups",
+        "description": "List app-scoped crash groups in a retained UTC half-open window, with occurrence totals and distinct installs.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "from": {
+                    "format": "date-time",
+                    "type": "string"
+                },
+                "to": {
+                    "format": "date-time",
+                    "type": "string"
+                },
+                "limit": {
+                    "default": 25,
+                    "minimum": 1,
+                    "maximum": 50,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "title": "Crash Groups",
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "crash_detail",
+        "title": "Crash Detail",
+        "description": "Return one retained app-scoped crash event, including bounded frames and binary symbol inputs.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "event_id": {
+                    "minLength": 26,
+                    "maxLength": 26,
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id",
+                "event_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "title": "Crash Detail",
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "crash_free_users",
+        "title": "Crash Free Users",
+        "description": "Return an observed install-based crash-free proxy from retained ordinary and crash events, with OS coverage caveats.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "from": {
+                    "format": "date-time",
+                    "type": "string"
+                },
+                "to": {
+                    "format": "date-time",
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "title": "Crash Free Users",
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
         "name": "install_timeline",
         "title": "Install Timeline",
         "description": "Return up to 200 ordered retained events for exactly one app-scoped install or client session.",

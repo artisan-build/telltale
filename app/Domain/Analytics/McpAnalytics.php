@@ -30,7 +30,7 @@ final readonly class McpAnalytics
     public function apps(): array
     {
         return TrackedApp::query()
-            ->withMax('events', 'occurred_at')
+            ->withMax(['events' => fn (Builder $query) => $query->where('type', '!=', 'crash')], 'occurred_at')
             ->orderBy('id')
             ->limit(100)
             ->get()
@@ -68,6 +68,7 @@ final readonly class McpAnalytics
             ->first();
         $versions = StoredEvent::query()
             ->where('app_id', $app->id)
+            ->where('type', '!=', 'crash')
             ->where('occurred_at', '>=', $from)
             ->selectRaw('client_version, MAX(occurred_at) AS last_seen_at')
             ->groupBy('client_version')
@@ -382,6 +383,7 @@ final readonly class McpAnalytics
     ): array {
         $query = StoredEvent::query()
             ->where('app_id', $app->id)
+            ->where('type', '!=', 'crash')
             ->where('occurred_at', '>=', CarbonImmutable::now('UTC')->subDays(90));
 
         if ($installUuid !== null) {
