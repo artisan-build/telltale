@@ -9,7 +9,7 @@ use App\Exceptions\InvalidIngestCredential;
 use App\Models\Install;
 use App\Models\StoredEvent;
 use App\Models\TrackedApp;
-use ArtisanBuild\TelltaleContracts\EnvelopeV1;
+use ArtisanBuild\TelltaleContracts\Envelope;
 use ArtisanBuild\TelltaleContracts\Event;
 use ArtisanBuild\TelltaleContracts\EventType;
 use Carbon\CarbonImmutable;
@@ -20,7 +20,7 @@ final readonly class EventIngestor
 {
     public function __construct(private EventProjector $projector) {}
 
-    public function ingest(Install $install, string $token, EnvelopeV1 $envelope): IngestResult
+    public function ingest(Install $install, string $token, Envelope $envelope): IngestResult
     {
         return DB::transaction(function () use ($install, $token, $envelope): IngestResult {
             $app = TrackedApp::query()->whereKey($install->app_id)->lockForUpdate()->firstOrFail();
@@ -45,6 +45,28 @@ final readonly class EventIngestor
 
             foreach ($existingIds as $eventId) {
                 unset($uniqueEvents[$eventId]);
+            }
+
+            $reportIds = StoredEvent::query()
+                ->where('app_id', $app->id)
+                ->where('install_id', $lockedInstall->id)
+                ->whereIn('crash_report_id', array_values(array_filter(array_map(
+                    static fn (Event $event): ?string => $event->crash?->reportId,
+                    $uniqueEvents,
+                ))))
+                ->pluck('crash_report_id')->all();
+            $seenReports = array_fill_keys($reportIds, true);
+
+            foreach ($uniqueEvents as $eventId => $event) {
+                if ($event->crash === null) {
+                    continue;
+                }
+
+                if (isset($seenReports[$event->crash->reportId])) {
+                    unset($uniqueEvents[$eventId]);
+                } else {
+                    $seenReports[$event->crash->reportId] = true;
+                }
             }
 
             /** @var array<string, array<string, mixed>> $sessionContexts */
@@ -88,6 +110,11 @@ final readonly class EventIngestor
                     'session_id' => $event->sessionId,
                     'props' => $event->props,
                     'error' => $event->error?->toArray(),
+                    'crash' => $event->crash?->toArray(),
+                    'crash_report_id' => $event->crash?->reportId,
+                    'crash_fingerprint' => $event->crash?->fingerprint(),
+                    'crash_occurrence_count' => $event->crash?->occurrenceCount,
+                    'crash_fatal' => $event->crash?->fatal,
                     'client_version' => $envelope->clientVersion,
                 ]);
                 $this->projector->project($stored, $event, $lockedInstall, $sessionContexts[$event->sessionId] ?? null);

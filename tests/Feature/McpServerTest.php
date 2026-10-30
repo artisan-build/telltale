@@ -8,6 +8,9 @@ use App\Domain\Ingest\Credential as IngestCredential;
 use App\Http\Middleware\RejectIngestCredentialsFromReadSurface;
 use App\Mcp\Tools\ActiveUsers;
 use App\Mcp\Tools\Apps;
+use App\Mcp\Tools\CrashDetail;
+use App\Mcp\Tools\CrashFreeUsers;
+use App\Mcp\Tools\CrashGroups;
 use App\Mcp\Tools\DeleteInstall;
 use App\Mcp\Tools\ErrorDetail;
 use App\Mcp\Tools\Errors;
@@ -113,6 +116,9 @@ it('conforms all tools and snapshots the exact destructive-door inventory', func
     expect($names)->toBe([
         'active_users',
         'apps',
+        'crash_detail',
+        'crash_free_users',
+        'crash_groups',
         'delete_install',
         'error_detail',
         'errors',
@@ -201,6 +207,9 @@ it('returns 403 for both ingest credential classes on both MCP doors without que
 it('authorizes inside every handler and destructive preview before application queries', function (): void {
     $calls = [
         [Apps::class, []],
+        [CrashGroups::class, ['app_id' => 1]],
+        [CrashFreeUsers::class, ['app_id' => 1]],
+        [CrashDetail::class, ['app_id' => 1, 'event_id' => '01ARZ3NDEKTSV4RRFFQ69G5FAV']],
         [IngestHealth::class, ['app_id' => 1]],
         [EventCounts::class, ['app_id' => 1]],
         [ActiveUsers::class, ['app_id' => 1]],
@@ -250,7 +259,7 @@ it('admits active delegated members and admins and refuses malformed assertions'
         $response = telltaleMcpRequest('/mcp', mcpListPayload(), telltaleAssertion($key, $role, $role))
             ->assertOk();
 
-        expect($response->json('result.tools'))->toHaveCount(12);
+        expect($response->json('result.tools'))->toHaveCount(15);
     }
 
     $queries = [];
@@ -794,10 +803,10 @@ it('rotates an ingest key, stores only its hash, and returns the replacement onc
     ]), $token)->assertStatus(400)->assertJsonPath('error.message', 'confirmation_spent');
 });
 
-/** @return array{jsonrpc: string, id: string, method: string} */
+/** @return array<string, mixed> */
 function mcpListPayload(): array
 {
-    return ['jsonrpc' => '2.0', 'id' => 'tools-list', 'method' => 'tools/list'];
+    return ['jsonrpc' => '2.0', 'id' => 'tools-list', 'method' => 'tools/list', 'params' => ['per_page' => 100]];
 }
 
 /** @param array<string, mixed> $arguments @return array<string, mixed> */

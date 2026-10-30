@@ -21,6 +21,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $session_id
  * @property array<string, mixed> $props
  * @property array<string, mixed>|null $error
+ * @property array<string, mixed>|null $crash
+ * @property string|null $crash_report_id
+ * @property string|null $crash_fingerprint
+ * @property int|null $crash_occurrence_count
+ * @property bool|null $crash_fatal
  * @property string $client_version
  * @property int|null $server_session_id
  * @property int|null $error_group_id
@@ -50,6 +55,11 @@ final class StoredEvent extends Model
         'session_id',
         'props',
         'error',
+        'crash',
+        'crash_report_id',
+        'crash_fingerprint',
+        'crash_occurrence_count',
+        'crash_fatal',
         'client_version',
         'server_session_id',
         'error_group_id',
@@ -65,6 +75,9 @@ final class StoredEvent extends Model
             'occurred_at' => 'immutable_datetime',
             'props' => 'array',
             'error' => 'array',
+            'crash' => 'array',
+            'crash_occurrence_count' => 'integer',
+            'crash_fatal' => 'boolean',
         ];
     }
 

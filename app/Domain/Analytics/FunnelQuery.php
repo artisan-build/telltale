@@ -28,6 +28,7 @@ final class FunnelQuery
         $counts = array_fill(0, count($steps), 0);
         $eventsByInstall = StoredEvent::query()
             ->where('app_id', $app->id)
+            ->where('type', '!=', 'crash')
             ->where('occurred_at', '>=', $from)
             ->where('occurred_at', '<=', $to)
             ->orderBy('install_id')
