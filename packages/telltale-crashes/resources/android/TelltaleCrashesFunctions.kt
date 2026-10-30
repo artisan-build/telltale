@@ -23,17 +23,20 @@ object TelltaleCrashesFunctions {
         if (runtime == null) runtime = CrashRuntime(context.applicationContext)
     }
 
-    class Pending : BridgeFunction {
+    class Pending(context: Context) : BridgeFunction {
+        init { initialize(context) }
         override fun execute(parameters: Map<String, Any>): Map<String, Any> =
             BridgeResponse.success(runtime?.pending() ?: mapOf("schema_version" to 1, "reports" to emptyList<Any>(), "revision" to 0))
     }
-    class Acknowledge : BridgeFunction {
+    class Acknowledge(context: Context) : BridgeFunction {
+        init { initialize(context) }
         override fun execute(parameters: Map<String, Any>): Map<String, Any> {
             runtime?.acknowledge((parameters["report_ids"] as? List<*>)?.take(32)?.filterIsInstance<String>() ?: emptyList())
             return BridgeResponse.success(mapOf("scheduled" to true))
         }
     }
-    class SetSuppressed : BridgeFunction {
+    class SetSuppressed(context: Context) : BridgeFunction {
+        init { initialize(context) }
         override fun execute(parameters: Map<String, Any>): Map<String, Any> {
             (parameters["suppressed"] as? Boolean)?.let { runtime?.setSuppressed(it) }
             return BridgeResponse.success(mapOf("scheduled" to true))

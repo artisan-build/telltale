@@ -169,6 +169,28 @@ final class ClientDatabase
         $this->deleteSetting('drain_scheduled_until');
     }
 
+    public function claimCrashImportSchedule(int $now, int $seconds = 15): bool
+    {
+        return $this->transaction(function () use ($now, $seconds): bool {
+            if ((int) ($this->setting('crash_import_scheduled_until') ?? 0) > $now) {
+                return false;
+            }
+            $this->putSetting('crash_import_scheduled_until', (string) ($now + max(1, $seconds)));
+
+            return true;
+        });
+    }
+
+    public function clearCrashImportSchedule(): void
+    {
+        $this->deleteSetting('crash_import_scheduled_until');
+    }
+
+    public function deferCrashImportSchedule(int $until): void
+    {
+        $this->putSetting('crash_import_scheduled_until', (string) max(0, $until));
+    }
+
     /**
      * @param  array<string, mixed>  $event
      */

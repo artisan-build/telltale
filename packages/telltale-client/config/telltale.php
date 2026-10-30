@@ -6,7 +6,7 @@ return [
     'url' => env('TELLTALE_URL'),
     'ingest' => env('TELLTALE_INGEST'),
     'database' => database_path('telltale.sqlite'),
-    'client_version' => '1.0.0',
+    'client_version' => '1.2.0',
     'batch_size' => 100,
     'batch_max_bytes' => 524_288,
     'max_rows' => 10_000,

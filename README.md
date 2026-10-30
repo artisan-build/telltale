@@ -5,14 +5,15 @@ desktop and mobile apps. Its server runs in the developer's Laravel Cloud accoun
 client package captures device-side events for MCP-first analysis.
 
 > **Status: pre-launch MVP.** The contracts, device client, ingest and storage server, MCP tools, and
-> standard Built for Cloud package UI are implemented. Native crash reporting remains out of scope for
-> v1.
+> standard Built for Cloud package UI are implemented. Optional Mobile native crash reporting is
+> prepared for the next lockstep release; publication and physical-device verification remain gated.
 
 ## Repository Layout
 
 - `/` - the Telltale Laravel server application.
 - `packages/telltale-contracts` - versioned wire contracts shared by client and server.
 - `packages/telltale-client` - the package installed in NativePHP applications.
+- `packages/telltale-crashes` - optional Mobile v4 native crash collection and queued import.
 
 The monorepo uses Composer path repositories for local development, while tagged releases are split
 into read-only mirrors and published to Packagist for installation in other applications.
@@ -22,6 +23,8 @@ into read-only mirrors and published to Packagist for installation in other appl
 Telltale v1 will support events, screen views, estimated sessions, release adoption, product
 analytics, and the PHP error paths exposed by NativePHP. Native crashes, OOM failures, ANRs,
 background mobile uploads, session replay, feature flags, and a chart dashboard are not part of v1.
+The optional crash plugin extends Mobile capture without changing desktop capture or adding OS
+background-upload execution. See the [mobile crash guide](docs/mobile-crashes.md) for its release gates.
 
 ## Client Installation
 
@@ -39,6 +42,7 @@ composer require artisan-build/telltale-client
 - [Setup](docs/setup.md) - generated from the same source as the package setup page and Scalpels handoff.
 - [Privacy declarations](docs/privacy.md) - Apple manifest, App Store label, and Google Play answers.
 - [Platform data reference](docs/data-reference.md) - exact capture, trace-header, and v1 limits.
+- [Mobile crashes](docs/mobile-crashes.md) - planned split-package installation, privacy hook and device checks.
 - [Scalpels post-provision handoff](docs/scalpels-handoff.md) - deterministic integration copy with no
   client-wiring automation.
 
@@ -61,6 +65,7 @@ php artisan key:generate
 php artisan migrate
 composer -d packages/telltale-contracts install --no-interaction --prefer-dist
 composer -d packages/telltale-client install --no-interaction --prefer-dist
+composer -d packages/telltale-crashes install --no-interaction --prefer-dist
 composer dev
 ```
 
@@ -70,7 +75,7 @@ are committed under `public/build`.
 ## Quality Gate
 
 `composer ready` is the hard gate. It regenerates IDE helpers, runs Rector and root/package Pint,
-performs root and package static analysis, runs all three Pest suites, and audits every Composer lock
+performs root and package static analysis, runs all four Pest suites, and audits every Composer lock
 file.
 
 Focused package commands are also available:
@@ -85,6 +90,10 @@ composer packages:audit
 CI defines the required `server (8.5)`, `client (8.4)`, `client (8.5)`, and `quality` check contexts.
 The server and contracts run on PHP 8.5 against PostgreSQL 16. The device-side client runs its
 standalone package checks on PHP 8.4 and 8.5 without PostgreSQL. Composer's PHP floor remains `^8.4`.
+The added `crashes (8.4)` and `crashes (8.5)` lanes cover the PHP plugin. `crashes native (ios)` and
+`crashes native (android)` compile actual native sources with narrow bridge stubs and run harnesses;
+they do not build full NativePHP apps or replace device dogfood. Existing lowest-dependency lanes
+also exercise the crash package on Laravel 11, 12 and 13.
 
 ## Built For Cloud
 
@@ -96,7 +105,10 @@ environment or resource has been provisioned by this scaffold.
 
 Tags matching `v*` run the package split workflow. Telltale v1.0.0 was split to the read-only
 `artisan-build/telltale-contracts` and `artisan-build/telltale-client` mirrors and published on
-Packagist. Later releases use the same workflow.
+Packagist. The next release also splits `artisan-build/telltale-crashes`, whose mirror and split-token
+access must be approved before tagging because Kibble discovers all three package directories,
+removes local path repositories from split artifacts, and tags them in lockstep. No crash release is
+claimed here.
 
 ## Repository
 

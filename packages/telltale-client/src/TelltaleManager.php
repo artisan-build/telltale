@@ -7,6 +7,7 @@ namespace ArtisanBuild\TelltaleClient;
 use ArtisanBuild\TelltaleClient\Capture\ContextCollector;
 use ArtisanBuild\TelltaleClient\Capture\ErrorSanitizer;
 use ArtisanBuild\TelltaleClient\Contracts\TelltaleClient;
+use ArtisanBuild\TelltaleClient\Events\ConsentChanged;
 use ArtisanBuild\TelltaleClient\Storage\ClientDatabase;
 use ArtisanBuild\TelltaleClient\Support\DrainScheduler;
 use ArtisanBuild\TelltaleClient\Support\Privacy;
@@ -61,6 +62,7 @@ final class TelltaleManager implements TelltaleClient
     {
         try {
             $this->database->setOptedOut(true);
+            event(new ConsentChanged(true));
         } catch (Throwable) {
             // Consent controls remain safe if device storage is unavailable.
         }
@@ -70,6 +72,7 @@ final class TelltaleManager implements TelltaleClient
     {
         try {
             $this->database->setOptedOut(false);
+            event(new ConsentChanged(false));
         } catch (Throwable) {
             // Consent controls remain safe if device storage is unavailable.
         }

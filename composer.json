@@ -16,7 +16,7 @@
     "require": {
         "php": "^8.4",
         "artisan-build/built-for-cloud": "^0.21.0",
-        "artisan-build/telltale-contracts": "^1.0",
+        "artisan-build/telltale-contracts": "^1.2",
         "laravel/chisel": "^0.1.0",
         "laravel/framework": "^13.19",
         "laravel/mcp": "^1.0",
@@ -112,23 +112,28 @@
         ],
         "packages:lint": [
             "composer -d packages/telltale-contracts lint",
-            "composer -d packages/telltale-client lint"
+            "composer -d packages/telltale-client lint",
+            "composer -d packages/telltale-crashes lint"
         ],
         "packages:lint:check": [
             "composer -d packages/telltale-contracts lint:check",
-            "composer -d packages/telltale-client lint:check"
+            "composer -d packages/telltale-client lint:check",
+            "composer -d packages/telltale-crashes lint:check"
         ],
         "packages:stan": [
             "composer -d packages/telltale-contracts stan",
-            "composer -d packages/telltale-client stan"
+            "composer -d packages/telltale-client stan",
+            "composer -d packages/telltale-crashes stan"
         ],
         "packages:test": [
             "composer -d packages/telltale-contracts test",
-            "composer -d packages/telltale-client test"
+            "composer -d packages/telltale-client test",
+            "composer -d packages/telltale-crashes test"
         ],
         "packages:audit": [
             "composer -d packages/telltale-contracts audit --abandoned=report",
-            "composer -d packages/telltale-client audit --abandoned=report"
+            "composer -d packages/telltale-client audit --abandoned=report",
+            "composer -d packages/telltale-crashes audit --abandoned=report"
         ],
         "ready": [
             "@ide-helper",
