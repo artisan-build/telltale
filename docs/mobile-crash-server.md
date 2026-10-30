@@ -24,7 +24,8 @@ Ingest credentials cannot use the read tools.
   percentage, window bounds, timestamp attribution and coverage caveats. The percentage is null
   when no installs are observed.
 
-Supply RFC3339 timestamps with a timezone. Windows are UTC half-open intervals `[from,to)`.
+Supply RFC3339 timestamps with a timezone and at most six fractional digits (microseconds).
+Query bounds with greater precision are rejected. Windows are UTC half-open intervals `[from,to)`.
 The default ends now and spans the smaller of 30 days and configured raw retention. Explicit
 windows must be ordered, cannot end in the future, and cannot span more than the smaller of 366
 days and raw retention. Windows starting before the retention horizon are rejected. The server

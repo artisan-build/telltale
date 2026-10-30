@@ -345,3 +345,95 @@ it('clamps default crash MCP windows to a shorter prune horizon while preserving
         }
     }
 });
+
+it('preserves fractional crash-free boundaries instead of reversing the observed population', function (): void {
+    [$app, $key] = storageApp();
+    [, $ordinary] = storageInstall($app, $key);
+    [, $fatal] = storageInstall($app, $key);
+    $this->withToken($ordinary)->postJson('/api/ingest', storageEnvelope([
+        storageEvent('before-window', 'event', '2026-10-29T10:00:00.100000Z', 'ordinary'),
+    ]))->assertAccepted();
+    $this->withToken($fatal)->postJson('/api/ingest', crashEnvelope([
+        crashEvent(crashReport(['occurred_at' => '2026-10-29T10:00:01.100000Z'])),
+    ]))->assertAccepted();
+    expect(StoredEvent::query()->where('app_id', $app->id)->orderBy('id')->get()->map(fn (StoredEvent $event): string => $event->occurred_at->format('s.u'))->all())
+        ->toBe(['00.100000', '01.100000']);
+    $reader = telltaleMcpCredential([TelltaleAbility::Read->value]);
+    $arguments = ['app_id' => $app->id, 'from' => '2026-10-29T10:00:00.500000Z', 'to' => '2026-10-29T10:00:01.500000Z'];
+    $metric = telltaleMcpTool('crash_free_users', $arguments, $reader);
+
+    expect($metric)->toMatchArray([
+        'active_users' => 1, 'affected_users' => 1, 'crash_free_users' => 0, 'crash_free_percentage' => 0.0,
+        'from' => '2026-10-29T10:00:00.500000+00:00', 'to' => '2026-10-29T10:00:01.500000+00:00',
+    ]);
+    $groups = telltaleMcpTool('crash_groups', $arguments, $reader);
+    expect($groups['groups'])->toHaveCount(1)
+        ->and($groups['groups'][0]['first_seen_at'])->toBe('2026-10-29T10:00:01.100000+00:00');
+});
+
+it('selects fractional crash groups wholly within one second with equivalent timezone instants', function (): void {
+    [$app, $key] = storageApp();
+    [, $token] = storageInstall($app, $key);
+    $reports = [
+        crashReport(['occurred_at' => '2026-10-29T10:00:00.499999Z', 'reason' => 'before']),
+        crashReport(['occurred_at' => '2026-10-29T10:00:00.500000Z']),
+        crashReport(['occurred_at' => '2026-10-29T10:00:00.700001Z']),
+        crashReport(['occurred_at' => '2026-10-29T10:00:00.900000Z', 'reason' => 'at_end']),
+        crashReport(['occurred_at' => '2026-10-29T10:00:00.900001Z', 'reason' => 'after']),
+    ];
+    $this->withToken($token)->postJson('/api/ingest', crashEnvelope(array_map(crashEvent(...), $reports)))->assertAccepted();
+    $reader = telltaleMcpCredential([TelltaleAbility::Read->value]);
+    $arguments = ['app_id' => $app->id, 'from' => '2026-10-29T10:00:00.500000Z', 'to' => '2026-10-29T10:00:00.900000Z'];
+    $groups = telltaleMcpTool('crash_groups', $arguments, $reader);
+
+    expect($groups['groups'])->toHaveCount(1)
+        ->and($groups)->toMatchArray([
+            'from' => '2026-10-29T10:00:00.500000+00:00', 'to' => '2026-10-29T10:00:00.900000+00:00',
+        ])
+        ->and($groups['groups'][0])->toMatchArray([
+            'fingerprint' => CrashDetails::fromArray($reports[1])->fingerprint(), 'count' => 2, 'installs_affected' => 1,
+            'first_seen_at' => '2026-10-29T10:00:00.500000+00:00', 'last_seen_at' => '2026-10-29T10:00:00.700001+00:00',
+        ]);
+    $offsetArguments = array_replace($arguments, ['from' => '2026-10-29T12:00:00.500000+02:00', 'to' => '2026-10-29T05:00:00.900000-05:00']);
+    expect(telltaleMcpTool('crash_groups', $offsetArguments, $reader))->toBe($groups)
+        ->and(telltaleMcpTool('crash_free_users', $arguments, $reader))->toMatchArray([
+            'active_users' => 1, 'affected_users' => 1, 'crash_free_users' => 0,
+        ]);
+});
+
+it('applies a fractional retention horizon to crash detail and default windows without truncating occurrence times', function (): void {
+    Date::setTestNow(CarbonImmutable::parse('2026-10-30T12:00:00.500000Z'));
+    config(['telltale.storage.raw_event_retention_days' => 1]);
+    [$app, $key] = storageApp();
+    [, $token] = storageInstall($app, $key);
+    $before = crashEvent(crashReport(['occurred_at' => '2026-10-29T12:00:00.499999Z', 'reason' => 'expired']));
+    $at = crashEvent(crashReport(['occurred_at' => '2026-10-29T12:00:00.500000Z']));
+    $after = crashEvent(crashReport(['occurred_at' => '2026-10-29T12:00:00.500001Z']));
+    $this->withToken($token)->postJson('/api/ingest', crashEnvelope([$before, $at, $after]))->assertAccepted();
+    $query = resolve(CrashQuery::class);
+
+    expect(fn () => $query->detail($app, $before['event_id']))->toThrow(ModelNotFoundException::class)
+        ->and($query->detail($app, $at['event_id'])['occurred_at'])->toBe('2026-10-29T12:00:00.500000+00:00')
+        ->and($query->detail($app, $after['event_id'])['occurred_at'])->toBe('2026-10-29T12:00:00.500001+00:00');
+    $reader = telltaleMcpCredential([TelltaleAbility::Read->value]);
+    $groups = telltaleMcpTool('crash_groups', ['app_id' => $app->id], $reader);
+    expect($groups)->toMatchArray([
+        'from' => '2026-10-29T12:00:00.500000+00:00', 'to' => '2026-10-30T12:00:00.500000+00:00',
+    ])->and($groups['groups'])->toHaveCount(1)
+        ->and($groups['groups'][0]['count'])->toBe(2);
+});
+
+it('rejects fractional query precision beyond six digits with an actionable error', function (): void {
+    [$app] = storageApp();
+    $reader = telltaleMcpCredential([TelltaleAbility::Read->value]);
+
+    foreach (['crash_groups', 'crash_free_users'] as $tool) {
+        foreach (['from', 'to'] as $bound) {
+            $response = telltaleMcpRequest('/mcp', mcpToolPayload($tool, [
+                'app_id' => $app->id, $bound => '2026-10-29T10:00:00.1234567Z',
+            ]), $reader)->assertOk()->assertJsonPath('result.isError', true);
+
+            expect($response->json('result.content.0.text'))->toContain('six fractional digits');
+        }
+    }
+});

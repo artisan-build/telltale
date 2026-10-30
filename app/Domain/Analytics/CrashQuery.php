@@ -16,6 +16,12 @@ final class CrashQuery
     /** @return array{CarbonImmutable, CarbonImmutable} */
     public function window(?string $from, ?string $to): array
     {
+        foreach (['from' => $from, 'to' => $to] as $bound => $value) {
+            if ($value !== null && preg_match('/\.[0-9]{7,}/', $value) === 1) {
+                throw ValidationException::withMessages([$bound => 'Query bounds support at most six fractional digits (microseconds).']);
+            }
+        }
+
         $now = CarbonImmutable::now('UTC');
         $configured = config('telltale.storage.raw_event_retention_days', 90);
         $retention = is_int($configured) && $configured > 0 ? $configured : 90;
@@ -61,8 +67,8 @@ final class CrashQuery
                 'count' => (int) $row->getAttribute('occurrences'),
                 'reports' => (int) $row->getAttribute('reports'),
                 'installs_affected' => (int) $row->getAttribute('installs_affected'),
-                'first_seen_at' => CarbonImmutable::parse($row->getAttribute('first_seen_at'))->utc()->toAtomString(),
-                'last_seen_at' => CarbonImmutable::parse($row->getAttribute('last_seen_at'))->utc()->toAtomString(),
+                'first_seen_at' => $this->timestamp(CarbonImmutable::parse($row->getAttribute('first_seen_at'))),
+                'last_seen_at' => $this->timestamp(CarbonImmutable::parse($row->getAttribute('last_seen_at'))),
                 'first_version' => $row->getAttribute('first_version'),
                 'last_version' => $row->getAttribute('last_version'),
                 'first_build' => $row->getAttribute('first_build'),
@@ -78,13 +84,13 @@ final class CrashQuery
         $retention = is_int($configured) && $configured > 0 ? $configured : 90;
         $event = StoredEvent::query()->where('app_id', $app->id)->where('type', 'crash')
             ->where('event_id', $eventId)
-            ->where('occurred_at', '>=', $this->horizon($retention, CarbonImmutable::now('UTC')))->firstOrFail();
+            ->where('occurred_at', '>=', $this->horizon($retention, CarbonImmutable::now('UTC'))->format('Y-m-d H:i:s.uP'))->firstOrFail();
 
         return [
             'app_id' => $app->id,
             'event_id' => $event->event_id,
             'fingerprint' => $event->crash_fingerprint,
-            'occurred_at' => $event->occurred_at->toAtomString(),
+            'occurred_at' => $this->timestamp($event->occurred_at),
             'app_version' => $event->app_version,
             'platform' => $event->platform,
             'crash' => $event->crash,
@@ -121,13 +127,19 @@ final class CrashQuery
     private function events(TrackedApp $app, CarbonImmutable $from, CarbonImmutable $to): Builder
     {
         return StoredEvent::query()->where('app_id', $app->id)
-            ->where('occurred_at', '>=', $from)->where('occurred_at', '<', $to);
+            ->where('occurred_at', '>=', $from->utc()->format('Y-m-d H:i:s.uP'))
+            ->where('occurred_at', '<', $to->utc()->format('Y-m-d H:i:s.uP'));
     }
 
     /** @return array<string, mixed> */
     private function bounds(TrackedApp $app, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        return ['app_id' => $app->id, 'from' => $from->toAtomString(), 'to' => $to->toAtomString()];
+        return ['app_id' => $app->id, 'from' => $this->timestamp($from), 'to' => $this->timestamp($to)];
+    }
+
+    private function timestamp(CarbonImmutable $time): string
+    {
+        return $time->utc()->format($time->microsecond === 0 ? 'Y-m-d\TH:i:sP' : 'Y-m-d\TH:i:s.uP');
     }
 
     private function horizon(int $retention, CarbonImmutable $now): CarbonImmutable
