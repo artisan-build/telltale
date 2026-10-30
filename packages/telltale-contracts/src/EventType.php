@@ -9,6 +9,7 @@ enum EventType: string
     case Screen = 'screen';
     case Event = 'event';
     case Error = 'error';
+    case Crash = 'crash';
     case SessionStart = 'session_start';
     case SessionEnd = 'session_end';
     case Context = 'context';
