@@ -265,6 +265,33 @@ final class ClientDatabase
         return max(0, (int) ($this->setting('dropped_events_total') ?? 0));
     }
 
+    public function recordDrop(): void
+    {
+        $this->transaction(function (): void {
+            $this->putSetting('dropped_events_total', (string) ($this->droppedEventsTotal() + 1));
+        });
+    }
+
+    /** @param list<int> $sequences */
+    public function drop(array $sequences): void
+    {
+        $this->transaction(function () use ($sequences): void {
+            $this->acknowledge($sequences);
+            $dropped = $this->database->changes();
+            $this->putSetting('dropped_events_total', (string) ($this->droppedEventsTotal() + $dropped));
+        });
+    }
+
+    public function transportBatchLimit(int $configured): int
+    {
+        return max(1, min($configured, (int) ($this->setting('transport_batch_limit') ?? $configured)));
+    }
+
+    public function reduceTransportBatchLimit(int $rejectedCount): void
+    {
+        $this->putSetting('transport_batch_limit', (string) max(1, intdiv($rejectedCount, 2)));
+    }
+
     public function nextAttemptAt(): int
     {
         return max(0, (int) ($this->setting('next_attempt_at') ?? 0));
@@ -385,7 +412,9 @@ final class ClientDatabase
 
         try {
             $result = $callback();
-            $this->database->exec('COMMIT');
+            if (! $this->database->exec('COMMIT')) {
+                throw new RuntimeException('Telltale could not commit its local database operation.');
+            }
 
             return $result;
         } catch (Throwable $exception) {

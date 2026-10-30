@@ -8,6 +8,7 @@ return [
     'database' => database_path('telltale.sqlite'),
     'client_version' => '1.0.0',
     'batch_size' => 100,
+    'batch_max_bytes' => 524_288,
     'max_rows' => 10_000,
     'max_age_seconds' => 60 * 60 * 24 * 30,
     'http_timeout_seconds' => 10,
