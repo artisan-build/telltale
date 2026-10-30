@@ -50,7 +50,7 @@ final class CrashQuery
             ->selectRaw('(array_agg(app_version ORDER BY occurred_at DESC, id DESC))[1] AS last_version')
             ->selectRaw("(array_agg(crash->>'build' ORDER BY occurred_at, id))[1] AS first_build")
             ->selectRaw("(array_agg(crash->>'build' ORDER BY occurred_at DESC, id DESC))[1] AS last_build")
-            ->groupBy('crash_fingerprint')->orderByDesc('last_seen_at')->orderBy('crash_fingerprint')
+            ->groupBy('crash_fingerprint')->latest('last_seen_at')->orderBy('crash_fingerprint')
             ->limit($limit + 1)->get();
 
         return [
