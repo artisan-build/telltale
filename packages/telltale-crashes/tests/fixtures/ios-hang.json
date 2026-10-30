@@ -1,0 +1,10 @@
+{
+  "diagnosticMetaData": {"appVersion": "2.3.0", "appBuildVersion": "205", "hangDuration": "2500 ms"},
+  "callStackTree": {
+    "callStackPerThread": false,
+    "callStacks": [{"threadAttributed": true, "callStackRootFrames": [
+      {"binaryUUID": "70B89F27-1634-3580-A695-57CDB41D7743", "offsetIntoBinaryTextSegment": 4096, "sampleCount": 4, "binaryName": "MetricKitTestApp", "address": 4294971392,
+        "subFrames": [{"binaryUUID": "70B89F27-1634-3580-A695-57CDB41D7743", "offsetIntoBinaryTextSegment": 8192, "sampleCount": 4, "binaryName": "MetricKitTestApp", "address": 4294975488}]}
+    ]}]
+  }
+}
