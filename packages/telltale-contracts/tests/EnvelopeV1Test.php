@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use ArtisanBuild\TelltaleContracts\ContractException;
 use ArtisanBuild\TelltaleContracts\EnvelopeV1;
+use ArtisanBuild\TelltaleContracts\EnvelopeV2;
 use ArtisanBuild\TelltaleContracts\ErrorDetails;
 use ArtisanBuild\TelltaleContracts\Event;
 use ArtisanBuild\TelltaleContracts\EventType;
@@ -100,12 +101,32 @@ it('serializes every event type exactly', function (EventType $type, string $val
         $event['error'] = validError();
     }
 
-    expect(EnvelopeV1::fromArray(validEnvelope(['events' => [$event]]))->toArray()['events'][0]['type'])
+    $version = 1;
+    $class = EnvelopeV1::class;
+    if ($type === EventType::Crash) {
+        $event['crash'] = [
+            'schema_version' => 1,
+            'report_id' => hash('sha256', 'enum-fixture'),
+            'platform' => 'android',
+            'kind' => 'crash',
+            'source' => 'jvm_exception',
+            'reason' => 'uncaught_exception',
+            'fatal' => true,
+            'occurred_at' => $event['ts'],
+            'timestamp_precision' => 'exact',
+            'occurrence_count' => 1,
+        ];
+        $version = 2;
+        $class = EnvelopeV2::class;
+    }
+
+    expect($class::fromArray(validEnvelope(['envelope_version' => $version, 'events' => [$event]]))->toArray()['events'][0]['type'])
         ->toBe($value);
 })->with([
     'screen' => [EventType::Screen, 'screen'],
     'event' => [EventType::Event, 'event'],
     'error' => [EventType::Error, 'error'],
+    'crash' => [EventType::Crash, 'crash'],
     'session start' => [EventType::SessionStart, 'session_start'],
     'session end' => [EventType::SessionEnd, 'session_end'],
     'context' => [EventType::Context, 'context'],

@@ -6,6 +6,7 @@ namespace ArtisanBuild\TelltaleClient;
 
 use ArtisanBuild\TelltaleClient\Contracts\TelltaleClient;
 use ArtisanBuild\TelltaleClient\Transport\DrainResult;
+use ArtisanBuild\TelltaleContracts\CrashDetails;
 use ArtisanBuild\TelltaleContracts\ErrorDetails;
 use ArtisanBuild\TelltaleContracts\EventType;
 use Throwable;
@@ -28,6 +29,11 @@ final class NullTelltaleClient implements TelltaleClient
     }
 
     public function capture(string $name, EventType $type, array $props = [], ?ErrorDetails $error = null): void {}
+
+    public function importCrash(CrashDetails $crash): CrashImportOutcome
+    {
+        return CrashImportOutcome::Retry;
+    }
 
     public function report(Throwable $exception, string $source, array $props = []): void {}
 

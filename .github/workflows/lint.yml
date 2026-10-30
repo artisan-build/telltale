@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-scripts --no-progress --prefer-dist
 
+      - name: Install crashes tools
+        run: composer -d packages/telltale-crashes install --no-interaction --no-scripts --no-progress --prefer-dist
+
       - name: Check root code style
         run: composer lint:check
 

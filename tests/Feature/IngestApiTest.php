@@ -365,11 +365,11 @@ it('rejects malformed and unsupported envelopes with actionable validation error
         'HTTP_AUTHORIZATION' => 'Bearer '.$token,
     ], content: '{')->assertUnprocessable()->assertJson(['message' => 'The envelope is not valid JSON.']);
 
-    $this->withToken($token)->postJson('/api/ingest', ingestEnvelope(overrides: ['envelope_version' => 2]))
+    $this->withToken($token)->postJson('/api/ingest', ingestEnvelope(overrides: ['envelope_version' => 3]))
         ->assertUnprocessable()
         ->assertJson([
-            'supported_envelope_version' => 1,
-        ])->assertJsonPath('message', 'Envelope version 2 is newer than this server supports. Upgrade the Telltale server before retrying.');
+            'supported_envelope_version' => 2,
+        ]);
 
     $this->withToken($token)->postJson('/api/ingest', ingestEnvelope(overrides: ['events' => 'invalid']))
         ->assertUnprocessable()

@@ -1,0 +1,47 @@
+{
+  "envelope_version": 2,
+  "client_version": "test-client",
+  "dropped_events_total": 2,
+  "events": [
+    {
+      "event_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "name": "test.action",
+      "type": "event",
+      "ts": "2026-10-03T12:34:56Z",
+      "session_id": "test-session",
+      "props": {}
+    },
+    {
+      "event_id": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+      "name": "native.crash",
+      "type": "crash",
+      "ts": "2026-10-03T12:34:56Z",
+      "session_id": "native-test-report",
+      "props": {},
+      "crash": {
+        "schema_version": 1,
+        "report_id": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "platform": "ios",
+        "kind": "crash",
+        "source": "metrickit_diagnostic",
+        "reason": "signal_11",
+        "fatal": true,
+        "occurred_at": "2026-10-03T12:34:56Z",
+        "timestamp_precision": "exact",
+        "occurrence_count": 1,
+        "frames": [
+          {
+            "binary_name": "TestApp",
+            "binary_uuid": "11223344-5566-7788-99aa-bbccddeeff00",
+            "address": "0xffff000000001234",
+            "offset": "0x1234",
+            "load_address": "0xffff000000000000"
+          }
+        ],
+        "app_version": "test-crashed-version",
+        "build": "test-crashed-build",
+        "metadata": {"architecture": "arm64"}
+      }
+    }
+  ]
+}
