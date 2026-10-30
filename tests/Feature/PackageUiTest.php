@@ -193,6 +193,12 @@ it('shows six apps in the sidebar and puts the rest behind Show more', function 
         ->and(substr_count($content, 'x-show="more"'))->toBe(2)
         ->and($content)->toContain('data-testid="app-list-more"')
         ->toContain('Show 2 more');
+
+    $document = new DOMDocument;
+    $document->loadHTML($content, LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+
+    expect($xpath->query('//script[@src][@data-update-uri]')->length)->toBe(1);
 });
 
 it('shows setup on the dashboard until an app reports in, then agent prompts', function (): void {

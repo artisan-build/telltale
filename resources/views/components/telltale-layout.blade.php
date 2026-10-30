@@ -5,6 +5,10 @@
     <link rel="stylesheet" href="{{ asset('build/assets/app.css') }}">
 @endpush
 
+@push('scripts')
+    @livewireScripts
+@endpush
+
 <x-bfc-layout :title="$title">
     <x-slot:sidebar>
         <x-app-navigation />
