@@ -96,7 +96,7 @@ final class RedactCrash
 {
     public function __invoke(array $event): ?array
     {
-        $event['crash']['trace'] = null;
+        unset($event['crash']['trace']);
 
         return $event; // Return null to deliberately drop the report.
     }
@@ -118,8 +118,8 @@ folder includes the merged file as an app resource; inspect the final archive's 
 
 Crash and performance diagnostics are disclosed for app functionality, linked to a random Telltale
 install identifier, with no tracking. This is not IDFV, Android ID or another hardware identifier.
-The native plugin adds no required-reason API category: it does not use UserDefaults, system uptime
-or file timestamps. Retain the declarations required by the client runtime and other plugins.
+The native iOS implementation adds no required-reason API category: it does not use UserDefaults,
+system uptime or file timestamps. Retain the declarations required by the client runtime and other plugins.
 See [privacy declarations](privacy.md) for store-label and Data Safety additions.
 
 Manifest placement follows Apple's
