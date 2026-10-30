@@ -29,7 +29,8 @@ The default ends now and spans the smaller of 30 days and configured raw retenti
 windows must be ordered, cannot end in the future, and cannot span more than the smaller of 366
 days and raw retention. Windows starting before the retention horizon are rejected. The server
 also remembers pruning cutoffs: increasing retention cannot restore an interval already pruned.
-After a shorter manual prune, specify a window beginning at or after that cutoff.
+After a shorter manual prune, the default start advances to the retained-history cutoff.
+An explicit start before that cutoff remains an error.
 
 The metric uses the same retained raw events for both populations. Ordinary-event installs and
 crash-only installs both enter the denominator. Only fatal reports enter the affected set, once

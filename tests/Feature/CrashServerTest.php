@@ -316,3 +316,32 @@ it('serves a known two-install crash-free MCP window without counting repeated f
         'active_users' => 2, 'affected_users' => 1, 'crash_free_users' => 1, 'crash_free_percentage' => 50.0,
     ]);
 });
+
+it('clamps default crash MCP windows to a shorter prune horizon while preserving explicit interval errors', function (): void {
+    [$app, $key] = storageApp();
+    [, $token] = storageInstall($app, $key);
+    $this->withToken($token)->postJson('/api/ingest', crashEnvelope([
+        crashEvent(crashReport()),
+    ]))->assertAccepted();
+    $cutoff = CarbonImmutable::parse('2026-10-28T12:00:00Z');
+    resolve(RawEventPruner::class)->prune($cutoff);
+    config(['telltale.storage.raw_event_retention_days' => 365]);
+    $reader = telltaleMcpCredential([TelltaleAbility::Read->value]);
+
+    expect(telltaleMcpTool('crash_groups', ['app_id' => $app->id], $reader))->toMatchArray([
+        'from' => $cutoff->toAtomString(),
+    ])->and(telltaleMcpTool('crash_groups', ['app_id' => $app->id], $reader)['groups'][0]['count'])->toBe(1)
+        ->and(telltaleMcpTool('crash_free_users', ['app_id' => $app->id], $reader))->toMatchArray([
+            'from' => $cutoff->toAtomString(), 'active_users' => 1, 'affected_users' => 1, 'crash_free_percentage' => 0.0,
+        ]);
+
+    foreach (['crash_groups', 'crash_free_users'] as $tool) {
+        foreach ([
+            ['from' => '2026-10-28T11:59:59Z'],
+            ['to' => '2026-10-28T12:00:00Z'],
+        ] as $window) {
+            telltaleMcpRequest('/mcp', mcpToolPayload($tool, ['app_id' => $app->id, ...$window]), $reader)
+                ->assertOk()->assertJsonPath('result.isError', true);
+        }
+    }
+});

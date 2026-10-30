@@ -21,8 +21,13 @@ final class CrashQuery
         $retention = is_int($configured) && $configured > 0 ? $configured : 90;
         $end = $to === null ? $now : CarbonImmutable::parse($to)->utc();
         $start = $from === null ? $end->subDays(min(30, $retention)) : CarbonImmutable::parse($from)->utc();
+        $horizon = $this->horizon($retention, $now);
 
-        if ($start->lessThan($this->horizon($retention, $now))) {
+        if ($from === null) {
+            $start = $start->max($horizon);
+        }
+
+        if ($start->lessThan($horizon)) {
             throw ValidationException::withMessages(['from' => 'Retention limit: the requested window begins before retained raw history.']);
         }
 
