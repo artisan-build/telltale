@@ -1,0 +1,11 @@
+{
+  "timeStampBegin": "2026-10-28T00:00:00Z",
+  "timeStampEnd": "2026-10-29T00:00:00Z",
+  "appVersion": "2.4.0",
+  "includesMultipleApplicationVersions": false,
+  "metaData": {"appBuildVersion": "210"},
+  "applicationExitMetrics": {
+    "foregroundExitData": {"cumulativeMemoryResourceLimitExitCount": 2, "cumulativeAppWatchdogExitCount": 1, "cumulativeNormalAppExitCount": 13},
+    "backgroundExitData": {"cumulativeMemoryResourceLimitExitCount": 3, "cumulativeMemoryPressureExitCount": 4, "cumulativeAppWatchdogExitCount": 0, "cumulativeBackgroundTaskAssertionTimeoutExitCount": 0}
+  }
+}

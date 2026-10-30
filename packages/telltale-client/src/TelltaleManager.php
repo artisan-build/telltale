@@ -7,11 +7,14 @@ namespace ArtisanBuild\TelltaleClient;
 use ArtisanBuild\TelltaleClient\Capture\ContextCollector;
 use ArtisanBuild\TelltaleClient\Capture\ErrorSanitizer;
 use ArtisanBuild\TelltaleClient\Contracts\TelltaleClient;
+use ArtisanBuild\TelltaleClient\Events\ConsentChanged;
 use ArtisanBuild\TelltaleClient\Storage\ClientDatabase;
 use ArtisanBuild\TelltaleClient\Support\DrainScheduler;
 use ArtisanBuild\TelltaleClient\Support\Privacy;
 use ArtisanBuild\TelltaleClient\Transport\DrainResult;
 use ArtisanBuild\TelltaleClient\Transport\DrainService;
+use ArtisanBuild\TelltaleContracts\ContractException;
+use ArtisanBuild\TelltaleContracts\CrashDetails;
 use ArtisanBuild\TelltaleContracts\ErrorDetails;
 use ArtisanBuild\TelltaleContracts\Event;
 use ArtisanBuild\TelltaleContracts\EventType;
@@ -59,6 +62,7 @@ final class TelltaleManager implements TelltaleClient
     {
         try {
             $this->database->setOptedOut(true);
+            event(new ConsentChanged(true));
         } catch (Throwable) {
             // Consent controls remain safe if device storage is unavailable.
         }
@@ -68,6 +72,7 @@ final class TelltaleManager implements TelltaleClient
     {
         try {
             $this->database->setOptedOut(false);
+            event(new ConsentChanged(false));
         } catch (Throwable) {
             // Consent controls remain safe if device storage is unavailable.
         }
@@ -106,6 +111,72 @@ final class TelltaleManager implements TelltaleClient
             $this->scheduler->schedule();
         } catch (Throwable) {
             // Telemetry must never affect the host application.
+        } finally {
+            $this->capturing = false;
+        }
+    }
+
+    public function importCrash(CrashDetails $crash): CrashImportOutcome
+    {
+        if ($this->capturing) {
+            return CrashImportOutcome::Retry;
+        }
+
+        $this->capturing = true;
+
+        try {
+            if ($this->database->isOptedOut()) {
+                return CrashImportOutcome::Dropped;
+            }
+
+            $event = [
+                'event_id' => $crash->eventId(),
+                'name' => 'native_crash',
+                'type' => EventType::Crash->value,
+                'ts' => $crash->occurredAt,
+                'session_id' => 'native-'.$crash->reportId,
+                'props' => [],
+                'crash' => $crash->toArray(),
+            ];
+            $filtered = $this->beforeSend === null ? $event : ($this->beforeSend)($event);
+
+            if ($filtered === null) {
+                $this->database->recordDrop();
+
+                return CrashImportOutcome::Dropped;
+            }
+
+            // Callbacks may scrub content, but cannot turn a retry into another event.
+            foreach (['event_id', 'type', 'ts', 'session_id'] as $key) {
+                $filtered[$key] = $event[$key];
+            }
+            if (isset($filtered['crash']) && is_array($filtered['crash'])) {
+                foreach (['report_id', 'occurred_at'] as $key) {
+                    $filtered['crash'][$key] = $event['crash'][$key];
+                }
+            }
+
+            try {
+                $contract = Event::fromArray(Privacy::event($filtered));
+            } catch (ContractException) {
+                $this->database->recordDrop();
+
+                return CrashImportOutcome::Dropped;
+            }
+
+            $this->database->enqueue(
+                eventId: $contract->eventId,
+                event: $contract->toArray(),
+                // Retention is measured from acceptance, not historical occurrence.
+                createdAt: time(),
+                maxRows: max(1, (int) $this->config->get('telltale.max_rows', 10_000)),
+                maxAgeSeconds: max(1, (int) $this->config->get('telltale.max_age_seconds', 2_592_000)),
+            );
+            $this->scheduler->schedule();
+
+            return CrashImportOutcome::Enqueued;
+        } catch (Throwable) {
+            return CrashImportOutcome::Retry;
         } finally {
             $this->capturing = false;
         }

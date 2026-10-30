@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6ba527fd8b91cafa5a0bdf186a4d8b10",
+    "content-hash": "a61f6956a7111c398cc0f521f0b3d83c",
     "packages": [
         {
             "name": "artisan-build/bfc-client",
@@ -193,11 +193,11 @@
         },
         {
             "name": "artisan-build/telltale-contracts",
-            "version": "1.0.0",
+            "version": "1.2.0",
             "dist": {
                 "type": "path",
                 "url": "packages/telltale-contracts",
-                "reference": "df3dab420aeefaee3e720cc286321eac02cdf937"
+                "reference": "63d2b2417350e252eece960cababaa0e4e26966f"
             },
             "require": {
                 "php": "^8.4"

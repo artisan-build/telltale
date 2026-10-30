@@ -45,7 +45,9 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global url."https://x-access-token:${SPLIT_REPO_TOKEN}@github.com/".insteadOf "https://github.com/"
 
-      - name: Split and tag packages in lockstep
+      # Kibble discovers every packages/*/composer.json, including telltale-crashes.
+      # Before tagging: provision its mirror and grant the split token Contents:write there.
+      - name: Split contracts, client and crashes in lockstep
         env:
           APP_ENV: production
           GH_ORGANIZATION: artisan-build

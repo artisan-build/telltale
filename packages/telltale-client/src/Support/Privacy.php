@@ -33,7 +33,47 @@ final class Privacy
             $event['error'] = self::error($event['error']);
         }
 
+        if (isset($event['crash']) && is_array($event['crash'])) {
+            $event['crash'] = self::crash($event['crash']);
+        }
+
         return $event;
+    }
+
+    /**
+     * @param  array<string, mixed>  $crash
+     * @return array<string, mixed>
+     */
+    private static function crash(array $crash): array
+    {
+        // Structural IDs, timestamps, UUIDs/build IDs and canonical hex are not free text.
+        foreach (['reason' => 255, 'trace' => 16384] as $key => $limit) {
+            if (isset($crash[$key]) && is_string($crash[$key])) {
+                $crash[$key] = self::text($crash[$key], $limit);
+            }
+        }
+        if (isset($crash['frames']) && is_array($crash['frames'])) {
+            foreach ($crash['frames'] as &$frame) {
+                if (! is_array($frame)) {
+                    continue;
+                }
+                foreach (['binary_name' => 255, 'symbol' => 1024] as $key => $limit) {
+                    if (isset($frame[$key]) && is_string($frame[$key])) {
+                        $frame[$key] = self::text($frame[$key], $limit);
+                    }
+                }
+            }
+            unset($frame);
+        }
+        if (isset($crash['metadata']) && is_array($crash['metadata'])) {
+            $metadata = [];
+            foreach ($crash['metadata'] as $key => $value) {
+                $metadata[self::text((string) $key, 255)] = is_string($value) ? self::text($value, 1024) : $value;
+            }
+            $crash['metadata'] = $metadata;
+        }
+
+        return $crash;
     }
 
     /**
