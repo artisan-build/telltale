@@ -244,6 +244,11 @@ namespace App\Models{
  * @property string $session_id
  * @property array<string, mixed> $props
  * @property array<string, mixed>|null $error
+ * @property array<string, mixed>|null $crash
+ * @property string|null $crash_report_id
+ * @property string|null $crash_fingerprint
+ * @property int|null $crash_occurrence_count
+ * @property bool|null $crash_fatal
  * @property string $client_version
  * @property int|null $server_session_id
  * @property int|null $error_group_id
@@ -263,6 +268,11 @@ namespace App\Models{
  * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereAppId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereAppVersion($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereClientVersion($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereCrash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereCrashFatal($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereCrashFingerprint($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereCrashOccurrenceCount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereCrashReportId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereError($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|StoredEvent whereErrorGroupId($value)

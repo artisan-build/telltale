@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace ArtisanBuild\TelltaleClient\Testing;
 
 use ArtisanBuild\TelltaleClient\Contracts\TelltaleClient;
+use ArtisanBuild\TelltaleClient\CrashImportOutcome;
 use ArtisanBuild\TelltaleClient\Transport\DrainResult;
+use ArtisanBuild\TelltaleContracts\CrashDetails;
 use ArtisanBuild\TelltaleContracts\ErrorDetails;
 use ArtisanBuild\TelltaleContracts\EventType;
 use Closure;
@@ -83,6 +85,26 @@ final class TelltaleFake implements TelltaleClient
     public function capture(string $name, EventType $type, array $props = [], ?ErrorDetails $error = null): void
     {
         $this->event($name, $props);
+    }
+
+    public function importCrash(CrashDetails $crash): CrashImportOutcome
+    {
+        if ($this->optedOut) {
+            return CrashImportOutcome::Dropped;
+        }
+
+        try {
+            $event = ['name' => 'native_crash', 'props' => ['crash' => $crash->toArray()]];
+            $event = $this->beforeSend === null ? $event : ($this->beforeSend)($event);
+            if ($event === null || ! is_string($event['name'] ?? null) || ! is_array($event['props'] ?? null)) {
+                return CrashImportOutcome::Dropped;
+            }
+            $this->events[] = ['name' => $event['name'], 'props' => $event['props']];
+
+            return CrashImportOutcome::Enqueued;
+        } catch (Throwable) {
+            return CrashImportOutcome::Retry;
+        }
     }
 
     public function report(Throwable $exception, string $source, array $props = []): void

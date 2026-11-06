@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace ArtisanBuild\TelltaleClient\Contracts;
 
+use ArtisanBuild\TelltaleClient\CrashImportOutcome;
 use ArtisanBuild\TelltaleClient\Transport\DrainResult;
+use ArtisanBuild\TelltaleContracts\CrashDetails;
 use ArtisanBuild\TelltaleContracts\ErrorDetails;
 use ArtisanBuild\TelltaleContracts\EventType;
 use Throwable;
@@ -28,6 +30,8 @@ interface TelltaleClient
     public function beforeSend(?callable $callback): void;
 
     public function drain(): DrainResult;
+
+    public function importCrash(CrashDetails $crash): CrashImportOutcome;
 
     /**
      * @internal

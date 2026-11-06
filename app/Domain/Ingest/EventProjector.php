@@ -25,6 +25,15 @@ final class EventProjector
      */
     public function project(StoredEvent $stored, Event $event, Install $install, ?array $sessionContext): void
     {
+        if ($event->crash !== null) {
+            $stored->forceFill([
+                'app_version' => $event->crash->appVersion,
+                'platform' => $event->crash->platform,
+            ])->save();
+
+            return;
+        }
+
         $occurredAt = $stored->occurred_at;
         $dimensions = $this->dimensions($sessionContext ?? $install->current_context ?? []);
 

@@ -169,6 +169,28 @@ final class ClientDatabase
         $this->deleteSetting('drain_scheduled_until');
     }
 
+    public function claimCrashImportSchedule(int $now, int $seconds = 15): bool
+    {
+        return $this->transaction(function () use ($now, $seconds): bool {
+            if ((int) ($this->setting('crash_import_scheduled_until') ?? 0) > $now) {
+                return false;
+            }
+            $this->putSetting('crash_import_scheduled_until', (string) ($now + max(1, $seconds)));
+
+            return true;
+        });
+    }
+
+    public function clearCrashImportSchedule(): void
+    {
+        $this->deleteSetting('crash_import_scheduled_until');
+    }
+
+    public function deferCrashImportSchedule(int $until): void
+    {
+        $this->putSetting('crash_import_scheduled_until', (string) max(0, $until));
+    }
+
     /**
      * @param  array<string, mixed>  $event
      */
@@ -263,6 +285,33 @@ final class ClientDatabase
     public function droppedEventsTotal(): int
     {
         return max(0, (int) ($this->setting('dropped_events_total') ?? 0));
+    }
+
+    public function recordDrop(): void
+    {
+        $this->transaction(function (): void {
+            $this->putSetting('dropped_events_total', (string) ($this->droppedEventsTotal() + 1));
+        });
+    }
+
+    /** @param list<int> $sequences */
+    public function drop(array $sequences): void
+    {
+        $this->transaction(function () use ($sequences): void {
+            $this->acknowledge($sequences);
+            $dropped = $this->database->changes();
+            $this->putSetting('dropped_events_total', (string) ($this->droppedEventsTotal() + $dropped));
+        });
+    }
+
+    public function transportBatchLimit(int $configured): int
+    {
+        return max(1, min($configured, (int) ($this->setting('transport_batch_limit') ?? $configured)));
+    }
+
+    public function reduceTransportBatchLimit(int $rejectedCount): void
+    {
+        $this->putSetting('transport_batch_limit', (string) max(1, intdiv($rejectedCount, 2)));
     }
 
     public function nextAttemptAt(): int
@@ -385,7 +434,9 @@ final class ClientDatabase
 
         try {
             $result = $callback();
-            $this->database->exec('COMMIT');
+            if (! $this->database->exec('COMMIT')) {
+                throw new RuntimeException('Telltale could not commit its local database operation.');
+            }
 
             return $result;
         } catch (Throwable $exception) {

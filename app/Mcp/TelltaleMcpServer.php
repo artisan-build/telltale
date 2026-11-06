@@ -6,6 +6,9 @@ namespace App\Mcp;
 
 use App\Mcp\Tools\ActiveUsers;
 use App\Mcp\Tools\Apps;
+use App\Mcp\Tools\CrashDetail;
+use App\Mcp\Tools\CrashFreeUsers;
+use App\Mcp\Tools\CrashGroups;
 use App\Mcp\Tools\DeleteInstall;
 use App\Mcp\Tools\ErrorDetail;
 use App\Mcp\Tools\Errors;
@@ -41,6 +44,9 @@ final class TelltaleMcpServer extends Server
         Sessions::class,
         Errors::class,
         ErrorDetail::class,
+        CrashGroups::class,
+        CrashDetail::class,
+        CrashFreeUsers::class,
         InstallTimeline::class,
         DeleteInstall::class,
         RevokeInstall::class,

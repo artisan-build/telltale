@@ -1,0 +1,22 @@
+{
+    "namespace": "TelltaleCrashes",
+    "platforms": ["ios", "android"],
+    "bridge_functions": [
+        {"name": "TelltaleCrashes.Pending", "ios": "TelltaleCrashesFunctions.Pending", "android": "com.artisanbuild.plugins.telltale_crashes.TelltaleCrashesFunctions.Pending", "android_params": ["context"]},
+        {"name": "TelltaleCrashes.Acknowledge", "ios": "TelltaleCrashesFunctions.Acknowledge", "android": "com.artisanbuild.plugins.telltale_crashes.TelltaleCrashesFunctions.Acknowledge", "android_params": ["context"]},
+        {"name": "TelltaleCrashes.SetSuppressed", "ios": "TelltaleCrashesFunctions.SetSuppressed", "android": "com.artisanbuild.plugins.telltale_crashes.TelltaleCrashesFunctions.SetSuppressed", "android_params": ["context"]}
+    ],
+    "ios": {
+        "min_version": "18.0",
+        "init_function": "registerTelltaleCrashes",
+        "dependencies": {"swift_packages": [], "pods": []}
+    },
+    "android": {
+        "min_version": 30,
+        "init_function": "com.artisanbuild.plugins.telltale_crashes.registerTelltaleCrashes",
+        "dependencies": {"implementation": []}
+    },
+    "events": ["ArtisanBuild\\TelltaleCrashes\\Events\\ReportsReady"],
+    "service_provider": "ArtisanBuild\\TelltaleCrashes\\TelltaleCrashesServiceProvider",
+    "hooks": {"post_compile": "nativephp:telltale-crashes:privacy"}
+}

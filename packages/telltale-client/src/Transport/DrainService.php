@@ -7,7 +7,9 @@ namespace ArtisanBuild\TelltaleClient\Transport;
 use ArtisanBuild\TelltaleClient\Storage\ClientDatabase;
 use ArtisanBuild\TelltaleClient\Storage\OutboxItem;
 use ArtisanBuild\TelltaleContracts\EnvelopeV1;
+use ArtisanBuild\TelltaleContracts\EnvelopeV2;
 use ArtisanBuild\TelltaleContracts\Event;
+use ArtisanBuild\TelltaleContracts\EventType;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Response;
@@ -42,8 +44,10 @@ final readonly class DrainService
             }
 
             $items = $this->database->batch(
-                max(1, (int) $this->config->get('telltale.batch_size', 100)),
+                $this->database->transportBatchLimit(max(1, (int) $this->config->get('telltale.batch_size', 100))),
             );
+
+            $items = $this->boundedPrefix($items);
 
             if ($items === []) {
                 $this->database->resetTransportBackoff();
@@ -67,6 +71,16 @@ final readonly class DrainService
                 $response = $this->send($items);
             }
 
+            if ($response?->status() === 413) {
+                if (count($items) === 1) {
+                    $this->database->drop([$items[0]->sequence]);
+                } else {
+                    $this->database->reduceTransportBatchLimit(count($items));
+                }
+
+                return DrainResult::deferred(1);
+            }
+
             if ($response?->status() !== 202) {
                 return $this->failed($now);
             }
@@ -85,6 +99,51 @@ final readonly class DrainService
 
     /**
      * @param  list<OutboxItem>  $items
+     * @return list<OutboxItem>
+     */
+    private function boundedPrefix(array $items): array
+    {
+        $selected = [];
+        $limit = max(1, (int) $this->config->get('telltale.batch_max_bytes', 524_288));
+
+        foreach ($items as $item) {
+            $candidate = [...$selected, $item];
+            if (strlen($this->envelope($candidate)) <= $limit) {
+                $selected = $candidate;
+
+                continue;
+            }
+
+            if ($selected !== []) {
+                break;
+            }
+
+            // One oversized row must not poison everything behind it.
+            $this->database->drop([$item->sequence]);
+        }
+
+        return $selected;
+    }
+
+    /** @param list<OutboxItem> $items */
+    private function envelope(array $items): string
+    {
+        $events = array_map(
+            static fn (OutboxItem $item): Event => Event::fromArray($item->event),
+            $items,
+        );
+        $hasCrash = array_any($events, static fn (Event $event): bool => $event->type === EventType::Crash);
+        $class = $hasCrash ? EnvelopeV2::class : EnvelopeV1::class;
+
+        return (new $class(
+            clientVersion: (string) $this->config->get('telltale.client_version', '1.0.0'),
+            droppedEventsTotal: $this->database->droppedEventsTotal(),
+            events: $events,
+        ))->toJson();
+    }
+
+    /**
+     * @param  list<OutboxItem>  $items
      */
     private function send(array $items): ?Response
     {
@@ -96,16 +155,7 @@ final readonly class DrainService
         }
 
         try {
-            $events = array_map(
-                static fn (OutboxItem $item): Event => Event::fromArray($item->event),
-                $items,
-            );
-            $envelope = new EnvelopeV1(
-                clientVersion: (string) $this->config->get('telltale.client_version', '1.0.0'),
-                droppedEventsTotal: $this->database->droppedEventsTotal(),
-                events: $events,
-            );
-            $body = gzencode($envelope->toJson());
+            $body = gzencode($this->envelope($items));
 
             if ($body === false) {
                 return null;

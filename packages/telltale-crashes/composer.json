@@ -1,0 +1,42 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "artisan-build/telltale-crashes",
+    "description": "NativePHP Mobile crash collection and typed Telltale outbox import.",
+    "type": "nativephp-plugin",
+    "license": "MIT",
+    "version": "1.2.0",
+    "repositories": [
+        {"type": "path", "url": "../telltale-client", "options": {"symlink": true}},
+        {"type": "path", "url": "../telltale-contracts", "options": {"symlink": true}}
+    ],
+    "require": {
+        "php": "^8.4",
+        "artisan-build/telltale-client": "^1.2",
+        "artisan-build/telltale-contracts": "^1.2",
+        "ext-dom": "*",
+        "ext-json": "*",
+        "illuminate/console": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/queue": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.9",
+        "laravel/pint": "^1.27",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^4.7",
+        "phpstan/phpstan": "^2.1"
+    },
+    "autoload": {"psr-4": {"ArtisanBuild\\TelltaleCrashes\\": "src/"}},
+    "autoload-dev": {"psr-4": {"ArtisanBuild\\TelltaleCrashes\\Tests\\": "tests/"}},
+    "suggest": {"nativephp/mobile": "Native capture requires the Mobile v4 plugin runtime."},
+    "extra": {"laravel": {"providers": ["ArtisanBuild\\TelltaleCrashes\\TelltaleCrashesServiceProvider"]}},
+    "scripts": {
+        "lint": "pint",
+        "lint:check": "pint --test",
+        "stan": "phpstan analyse --memory-limit=256M",
+        "test": "pest"
+    },
+    "config": {"sort-packages": true, "allow-plugins": {"pestphp/pest-plugin": true}},
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

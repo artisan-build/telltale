@@ -12,7 +12,9 @@ use App\Exceptions\IngestVolumeExceeded;
 use App\Exceptions\InvalidIngestCredential;
 use App\Http\Middleware\EnforceIngestBodyLimit;
 use ArtisanBuild\TelltaleContracts\ContractException;
+use ArtisanBuild\TelltaleContracts\EnvelopeDecoder;
 use ArtisanBuild\TelltaleContracts\EnvelopeV1;
+use ArtisanBuild\TelltaleContracts\EnvelopeV2;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use JsonException;
@@ -67,16 +69,16 @@ final class IngestController extends Controller
         try {
             $version = EnvelopeV1::versionFrom($payload);
 
-            if ($version > EnvelopeV1::VERSION) {
+            if ($version > EnvelopeV2::VERSION) {
                 $health->rejection($install->app);
 
                 return response()->json([
                     'message' => "Envelope version {$version} is newer than this server supports. Upgrade the Telltale server before retrying.",
-                    'supported_envelope_version' => EnvelopeV1::VERSION,
+                    'supported_envelope_version' => EnvelopeV2::VERSION,
                 ], 422);
             }
 
-            $envelope = EnvelopeV1::fromArray($payload);
+            $envelope = EnvelopeDecoder::decode($payload);
         } catch (ContractException $exception) {
             $health->rejection($install->app);
 

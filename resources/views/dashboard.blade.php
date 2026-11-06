@@ -1,53 +1,7 @@
-@push('head')
-    <link rel="stylesheet" href="{{ asset('build/assets/app.css') }}">
-@endpush
+<x-telltale-layout :title="$selected?->name ?? 'Telltale apps'">
 
-<x-bfc-layout title="Telltale apps">
-<div class="grid gap-8 lg:grid-cols-[18rem_1fr]">
-    <aside class="grid content-start gap-6">
-        <section data-testid="app-create" class="bfc-panel grid gap-4">
-            <div>
-                <p class="text-sm font-semibold uppercase tracking-widest text-clay-muted">App management</p>
-                <h1 class="mt-1 font-display text-3xl font-normal tracking-tight text-clay-ink">Your apps</h1>
-                <p class="mt-2 text-sm leading-6 text-clay-soft">Up to 100 apps are shown. Analytics stay in MCP; this screen only manages ingest and recent health.</p>
-            </div>
-
-            <form method="POST" action="{{ route('telltale.apps.store') }}" class="grid gap-3">
-                @csrf
-                <label for="app-name" class="text-sm font-semibold text-clay-ink">App name</label>
-                <input id="app-name" name="name" value="{{ old('name') }}" required maxlength="255" autocomplete="off" class="min-h-12 w-full rounded-2xl border border-clay-edge bg-clay-slip px-4 py-3 text-base text-clay-ink shadow-clay-inset focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-clay-iron">
-                @error('name')
-                    <p class="text-sm text-red-700">{{ $message }}</p>
-                @enderror
-                <button type="submit" class="bfc-button w-fit">Create app</button>
-            </form>
-        </section>
-
-        <section data-testid="app-list" class="bfc-panel grid gap-3">
-            <h2 class="font-display text-2xl font-normal text-clay-ink">Select an app</h2>
-            @if ($apps === [])
-                <p class="text-sm leading-6 text-clay-soft">No apps yet. Create the first app above.</p>
-            @else
-                <nav aria-label="Telltale apps" class="grid gap-2">
-                    @foreach ($apps as $app)
-                        <a href="{{ route('telltale.apps.show', $app['id']) }}"
-                           class="rounded-xl border px-4 py-3 text-sm transition {{ $selected?->id === $app['id'] ? 'border-clay-iron bg-clay-slip text-clay-ink' : 'border-clay-edge bg-clay-surface text-clay-soft hover:border-clay-dot' }}">
-                            <strong class="block text-clay-ink">{{ $app['name'] }}</strong>
-                            <span>{{ $app['last_seen_at'] === null ? 'No retained events' : 'Latest retained event '.$app['last_seen_at'] }}</span>
-                        </a>
-                    @endforeach
-                </nav>
-            @endif
-        </section>
-    </aside>
-
+<div class="grid gap-8">
     <section class="grid content-start gap-6">
-        <nav data-testid="product-navigation" class="bfc-nav">
-            <a href="{{ route('bfc.dashboard') }}" aria-current="page">Apps</a>
-            <a href="{{ route('telltale.setup') }}">Setup</a>
-            <a href="{{ route('bfc.ui.home') }}">Account settings</a>
-        </nav>
-
         @if ($ingestValue !== null)
             <section data-testid="credential-reveal" class="rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 shadow-sm">
                 <p class="text-sm font-semibold uppercase tracking-widest">{{ $credentialAction === 'created' ? 'App created' : 'Ingest value rotated' }}</p>
@@ -61,6 +15,7 @@
             <section data-testid="app-empty" class="bfc-panel grid gap-3">
                 <h2 class="font-display text-3xl font-normal text-clay-ink">Create an app to begin</h2>
                 <p class="max-w-2xl leading-7 text-clay-soft">Each app receives its own public, write-only ingest value. It is safe to ship in the NativePHP build, but it cannot read management data.</p>
+                <a href="{{ route('telltale.setup') }}" class="bfc-button w-fit">Go to setup</a>
             </section>
         @else
             <section data-testid="selected-app" class="bfc-panel grid gap-5">
@@ -116,4 +71,4 @@
         @endif
     </section>
 </div>
-</x-bfc-layout>
+</x-telltale-layout>

@@ -38,7 +38,7 @@ it('serves an honest public landing without management state and protects packag
         ->assertDontSee($app->ingest_key_hash);
 
     $this->get('/dashboard')->assertRedirect(route('bfc.login', ['intended' => '/dashboard']));
-    $this->get('/setup')->assertRedirect(route('bfc.login'));
+    $this->get('/setup')->assertRedirect(route('bfc.login', ['intended' => '/setup']));
 });
 
 it('creates and rotates through the existing manager and reveals each plaintext value only in its response', function (): void {
@@ -119,17 +119,20 @@ it('keeps app and recent health reads scoped and bounded with truthful empty sta
         ->toContain(
             'Known app-attributed rejections',
             'Known app-attributed rate-limit hits',
-            'Latest retained event',
-            'No retained events',
         )
-        ->not->toContain('8765', '5678', '7654', 'client-00', 'Last ingest', 'No ingest yet')
+        ->not->toContain('8765')
+        ->not->toContain('5678')
+        ->not->toContain('7654')
+        ->not->toContain('client-00')
+        ->not->toContain('Last ingest')
+        ->not->toContain('No ingest yet')
         ->and(substr_count($content, 'client-'))->toBe(25);
 
-    TrackedApp::query()->delete();
+    Install::query()->delete();
     $this->get('/dashboard')
         ->assertOk()
-        ->assertSeeHtml('data-testid="app-empty"')
-        ->assertSee('No apps yet.');
+        ->assertSeeHtml('data-testid="setup-steps"')
+        ->assertDontSee('No apps yet.');
 });
 
 it('returns validation errors for invalid UTF-8 app names', function (): void {
@@ -145,13 +148,83 @@ it('returns validation errors for invalid UTF-8 app names', function (): void {
     expect(TrackedApp::query()->count())->toBe(0);
 });
 
+it('lists every app in the sidebar and keeps Setup at its foot, with no Apps or Account link', function (): void {
+    signIntoPackageUi($this);
+    $first = TrackedApp::factory()->create(['name' => 'Sidebar first app']);
+    $second = TrackedApp::factory()->create(['name' => 'Sidebar selected app']);
+
+    foreach ([
+        ['/dashboard', null],
+        [route('telltale.apps.show', $second), $second],
+        ['/setup', null],
+    ] as [$path, $selected]) {
+        $html = $this->get($path)->assertOk()->getContent();
+        $document = new DOMDocument;
+        $document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new DOMXPath($document);
+        $appList = '//*[@data-testid="bfc-sidebar-slot"]//*[@data-testid="app-list"]';
+
+        expect($xpath->query('//*[@data-testid="product-navigation"]')->length)->toBe(0)
+            ->and($xpath->query('//a[@href="'.route('bfc.ui.home').'"]')->length)->toBe(0)
+            ->and($xpath->query('//*[@data-testid="bfc-sidebar-bottom"]//a[@data-testid="setup-navigation"][@href="'.route('telltale.setup').'"]')->length)->toBe(1)
+            ->and($html)->not->toContain('Select an app');
+
+        foreach ([$first, $second] as $app) {
+            $link = '//a[@href="'.route('telltale.apps.show', $app).'"]';
+            expect($xpath->query($appList.$link)->length)->toBe(1)
+                ->and($xpath->query($appList.$link)->item(0)->textContent)->toContain($app->name);
+        }
+
+        expect($xpath->query($appList.'//a[@aria-current="page"]')->length)->toBe($selected === null ? 0 : 1);
+
+        if ($selected !== null) {
+            expect($xpath->query($appList.'//a[@href="'.route('telltale.apps.show', $selected).'" and @aria-current="page"]')->length)->toBe(1);
+        }
+    }
+});
+
+it('shows six apps in the sidebar and puts the rest behind Show more', function (): void {
+    signIntoPackageUi($this);
+    TrackedApp::factory()->count(8)->create();
+
+    $content = $this->get('/setup')->assertOk()->getContent();
+
+    expect(substr_count($content, 'data-testid="app-list-item"'))->toBe(8)
+        ->and(substr_count($content, 'x-show="more"'))->toBe(2)
+        ->and($content)->toContain('data-testid="app-list-more"')
+        ->toContain('Show 2 more');
+
+    $document = new DOMDocument;
+    $document->loadHTML($content, LIBXML_NOERROR | LIBXML_NOWARNING);
+    $xpath = new DOMXPath($document);
+
+    expect($xpath->query('//script[@src][@data-update-uri]')->length)->toBe(1);
+});
+
+it('shows setup on the dashboard until an app reports in, then agent prompts', function (): void {
+    signIntoPackageUi($this);
+    $app = TrackedApp::factory()->create();
+
+    $this->get('/dashboard')->assertOk()
+        ->assertSeeHtml('data-testid="setup-steps"')
+        ->assertSeeHtml('data-testid="app-create"')
+        ->assertDontSeeHtml('data-testid="agent-dashboard"');
+
+    Install::factory()->for($app, 'app')->create();
+
+    $this->get('/dashboard')->assertOk()
+        ->assertSeeHtml('data-testid="agent-dashboard"')
+        ->assertSeeHtml('data-testid="dashboard-prompt"')
+        ->assertDontSeeHtml('data-testid="setup-steps"');
+});
+
 it('caps the app list at one hundred rows', function (): void {
     signIntoPackageUi($this);
     TrackedApp::factory()->count(101)->sequence(
         fn ($sequence): array => ['name' => sprintf('Bounded app %03d', $sequence->index)],
     )->create();
 
-    $content = $this->get('/dashboard')->assertOk()->getContent();
+    $content = $this->get('/setup')->assertOk()->getContent();
 
     expect(substr_count($content, 'href="'.url('/dashboard/apps').'/'))->toBe(100)
         ->and($content)->toContain('Bounded app 099')

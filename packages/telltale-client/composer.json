@@ -5,7 +5,7 @@
     "keywords": ["telltale", "nativephp", "analytics", "laravel"],
     "license": "MIT",
     "type": "library",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "repositories": [
         {
             "type": "path",
@@ -17,7 +17,7 @@
     ],
     "require": {
         "php": "^8.4",
-        "artisan-build/telltale-contracts": "^1.0",
+        "artisan-build/telltale-contracts": "^1.2",
         "ext-json": "*",
         "ext-sqlite3": "*",
         "ext-zlib": "*",

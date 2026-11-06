@@ -4,6 +4,9 @@ This reference describes the data emitted by `artisan-build/telltale-client` v1.
 once per estimated session rather than copied into every event. Every captured event has a client ULID,
 name, type, timestamp, session UUID, bounded properties, and the client package version.
 
+The optional [Mobile crash plugin](mobile-crashes.md) adds typed crash reports in envelope v2.
+The sections below retain the ordinary v1 capture rules, including the AsyncTask exclusion.
+
 ## Captured On Both Platforms
 
 - Developer events sent with `Telltale::event()`, including developer-defined bounded properties.
@@ -78,6 +81,21 @@ registration and ingest endpoints do not receive the header, and opting out remo
 - Nightwatch sensor telemetry, native crash plugins, lifecycle plugins, crash-free metrics, heatmaps,
   session replay, experiments, feature flags, or a chart dashboard.
 
-Native crash hooks, lifecycle additions, background flush, AsyncTask hooks, an OTA-version API,
-Nightwatch reuse, crash-free metrics, and privacy-plugin guidance are v2 or NativePHP asks. Telltale v1
-does not implement them.
+The optional crash package implements Mobile native capture and privacy-manifest merging outside
+this v1 capture surface. It does not add AsyncTask hooks, new lifecycle signals, background flush,
+an OTA-version API, Nightwatch sensors or desktop Crashpad capture.
+
+## Optional crash reports
+
+Crash details carry a stable native report ID, historical occurrence time, source, classification,
+fatal flag, occurrence count, available historical app version/build and selected bounded frames.
+MetricKit aggregate exits also carry reporting windows and window-end timestamp precision. They
+do not assert that each exit occurred at that timestamp. Reports use a report-derived event ULID
+and `native-<report_id>` correlation marker, without attaching a current session or launch context.
+
+Only selected native diagnostics enter the wire payload. No raw attachment is uploaded: the native
+projectors select frame and classification fields without exporting memory dumps, register sets,
+Android log buffers or file-descriptor lists, and PHP then filters free text while retaining binary
+UUIDs, build IDs and canonical hex locations. Native collection, PHP import and outbox transport
+are separate background steps while the app can run. See the crash guide for platform bounds,
+queued callbacks and verification limits.

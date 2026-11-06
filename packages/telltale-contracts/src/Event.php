@@ -33,6 +33,7 @@ final readonly class Event implements JsonSerializable
         public string $sessionId,
         array $props,
         public ?ErrorDetails $error = null,
+        public ?CrashDetails $crash = null,
     ) {
         if (! self::isCanonicalUlid($eventId)) {
             throw new ContractException('event_id must be a canonical ULID.');
@@ -54,6 +55,14 @@ final readonly class Event implements JsonSerializable
 
         if ($type !== EventType::Error && $error !== null) {
             throw new ContractException('Only error events may carry error details.');
+        }
+
+        if (($type === EventType::Crash) !== ($crash !== null)) {
+            throw new ContractException('Only crash events require and accept crash details.');
+        }
+
+        if ($crash !== null && $timestamp !== $crash->occurredAt) {
+            throw new ContractException('ts must equal crash.occurred_at.');
         }
     }
 
@@ -100,6 +109,18 @@ final readonly class Event implements JsonSerializable
             throw new ContractException('Only error events may carry error details.');
         }
 
+        $crash = null;
+        if (array_key_exists('crash', $data)) {
+            $crashData = $data['crash'];
+            if ($crashData instanceof stdClass) {
+                $crashData = get_object_vars($crashData);
+            }
+            if ($type !== EventType::Crash || ! is_array($crashData)) {
+                throw new ContractException('Only crash events may carry a crash object.');
+            }
+            $crash = CrashDetails::fromArray($crashData);
+        }
+
         return new self(
             eventId: self::requiredString($data, 'event_id'),
             name: self::requiredString($data, 'name'),
@@ -108,11 +129,12 @@ final readonly class Event implements JsonSerializable
             sessionId: self::requiredString($data, 'session_id'),
             props: $props,
             error: $error,
+            crash: $crash,
         );
     }
 
     /**
-     * @return array{event_id: string, name: string, type: string, ts: string, session_id: string, props: array<string, mixed>, error?: array{class: string, message: string, file: string, line: int, stack: list<string>, fingerprint?: string}}
+     * @return array{event_id: string, name: string, type: string, ts: string, session_id: string, props: array<string, mixed>, error?: array{class: string, message: string, file: string, line: int, stack: list<string>, fingerprint?: string}, crash?: array<string, mixed>}
      */
     public function toArray(): array
     {
@@ -127,6 +149,10 @@ final readonly class Event implements JsonSerializable
 
         if ($this->error !== null) {
             $data['error'] = $this->error->toArray();
+        }
+
+        if ($this->crash !== null) {
+            $data['crash'] = $this->crash->toArray();
         }
 
         return $data;
@@ -148,6 +174,10 @@ final readonly class Event implements JsonSerializable
 
         if ($this->error !== null) {
             $data['error'] = $this->error->toArray();
+        }
+
+        if ($this->crash !== null) {
+            $data['crash'] = $this->crash->jsonSerialize();
         }
 
         return $data;
@@ -196,7 +226,8 @@ final readonly class Event implements JsonSerializable
         return preg_match('/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/D', $value) === 1;
     }
 
-    private static function assertTimestamp(string $value): void
+    /** @internal */
+    public static function assertTimestamp(string $value): void
     {
         $matches = [];
         $matched = preg_match(

@@ -8,6 +8,9 @@ use App\Domain\Ingest\Credential as IngestCredential;
 use App\Http\Middleware\RejectIngestCredentialsFromReadSurface;
 use App\Mcp\Tools\ActiveUsers;
 use App\Mcp\Tools\Apps;
+use App\Mcp\Tools\CrashDetail;
+use App\Mcp\Tools\CrashFreeUsers;
+use App\Mcp\Tools\CrashGroups;
 use App\Mcp\Tools\DeleteInstall;
 use App\Mcp\Tools\ErrorDetail;
 use App\Mcp\Tools\Errors;
@@ -30,11 +33,8 @@ use App\Models\StoredEvent;
 use App\Models\TrackedApp;
 use ArtisanBuild\BuiltForCloud\Console\ConsoleKeyring;
 use ArtisanBuild\BuiltForCloud\Console\DelegatedActor;
-use ArtisanBuild\BuiltForCloud\Credential;
 use ArtisanBuild\BuiltForCloud\CredentialAbilityRegistry;
-use ArtisanBuild\BuiltForCloud\CredentialKind;
 use ArtisanBuild\BuiltForCloud\CredentialPurpose;
-use ArtisanBuild\BuiltForCloud\CredentialStatus;
 use ArtisanBuild\BuiltForCloud\OffboardedSubject;
 use ArtisanBuild\BuiltForCloud\SubjectType;
 use ArtisanBuild\BuiltForCloud\Testing\McpProductAdmission;
@@ -113,6 +113,9 @@ it('conforms all tools and snapshots the exact destructive-door inventory', func
     expect($names)->toBe([
         'active_users',
         'apps',
+        'crash_detail',
+        'crash_free_users',
+        'crash_groups',
         'delete_install',
         'error_detail',
         'errors',
@@ -201,6 +204,9 @@ it('returns 403 for both ingest credential classes on both MCP doors without que
 it('authorizes inside every handler and destructive preview before application queries', function (): void {
     $calls = [
         [Apps::class, []],
+        [CrashGroups::class, ['app_id' => 1]],
+        [CrashFreeUsers::class, ['app_id' => 1]],
+        [CrashDetail::class, ['app_id' => 1, 'event_id' => '01ARZ3NDEKTSV4RRFFQ69G5FAV']],
         [IngestHealth::class, ['app_id' => 1]],
         [EventCounts::class, ['app_id' => 1]],
         [ActiveUsers::class, ['app_id' => 1]],
@@ -250,7 +256,7 @@ it('admits active delegated members and admins and refuses malformed assertions'
         $response = telltaleMcpRequest('/mcp', mcpListPayload(), telltaleAssertion($key, $role, $role))
             ->assertOk();
 
-        expect($response->json('result.tools'))->toHaveCount(12);
+        expect($response->json('result.tools'))->toHaveCount(15);
     }
 
     $queries = [];
@@ -794,49 +800,10 @@ it('rotates an ingest key, stores only its hash, and returns the replacement onc
     ]), $token)->assertStatus(400)->assertJsonPath('error.message', 'confirmation_spent');
 });
 
-/** @return array{jsonrpc: string, id: string, method: string} */
+/** @return array<string, mixed> */
 function mcpListPayload(): array
 {
-    return ['jsonrpc' => '2.0', 'id' => 'tools-list', 'method' => 'tools/list'];
-}
-
-/** @param array<string, mixed> $arguments @return array<string, mixed> */
-function mcpToolPayload(string $name, array $arguments = []): array
-{
-    return [
-        'jsonrpc' => '2.0',
-        'id' => $name.'-'.str()->random(8),
-        'method' => 'tools/call',
-        'params' => ['name' => $name, 'arguments' => $arguments],
-    ];
-}
-
-/** @param array<string, mixed> $payload */
-function telltaleMcpRequest(string $path, array $payload, string $token): TestResponse
-{
-    return test()->postJson($path, $payload, ['Authorization' => 'Bearer '.$token]);
-}
-
-/** @param list<string> $abilities */
-function telltaleMcpCredential(
-    array $abilities,
-    ?User $user = null,
-    CredentialPurpose $purpose = CredentialPurpose::Mcp,
-): string {
-    $token = 'mcp-'.bin2hex(random_bytes(24));
-    Credential::query()->create([
-        'kind' => CredentialKind::Bearer,
-        'purpose' => $purpose,
-        'subject_type' => $user instanceof User ? SubjectType::UserPrincipal : SubjectType::Installation,
-        'subject_ref' => $user instanceof User ? 'user-'.$user->id : 'telltale-installation',
-        'name' => 'Telltale MCP test',
-        'abilities' => $abilities,
-        'user_id' => $user instanceof User ? (string) $user->id : null,
-        'secret_hash' => hash('sha256', $token),
-        'status' => CredentialStatus::Active,
-    ]);
-
-    return $token;
+    return ['jsonrpc' => '2.0', 'id' => 'tools-list', 'method' => 'tools/list', 'params' => ['per_page' => 100]];
 }
 
 function telltaleMcpUser(string $status, ?int $id = null): User
@@ -866,22 +833,6 @@ function telltaleMcpToolResponse(
 ): TestResponse {
     return telltaleMcpRequest('/mcp/destructive', mcpToolPayload($name, $arguments), $token)
         ->assertOk();
-}
-
-/** @return array<string, mixed> */
-function telltaleMcpTool(string $name, array $arguments, string $token): array
-{
-    return mcpContent(telltaleMcpRequest('/mcp', mcpToolPayload($name, $arguments), $token)->assertOk());
-}
-
-/** @return array<string, mixed> */
-function mcpContent(TestResponse $response): array
-{
-    $text = $response->json('result.content.0.text');
-    expect($text)->toBeString();
-    expect($response->json('result.isError'))->not->toBeTrue($text);
-
-    return json_decode($text, true, flags: JSON_THROW_ON_ERROR);
 }
 
 function mcpConfirmationValue(TestResponse $response): string

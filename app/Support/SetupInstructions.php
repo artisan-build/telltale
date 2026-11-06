@@ -21,6 +21,7 @@ final class SetupInstructions
                 'title' => 'Create the app',
                 'body' => 'Create an app in the Telltale package UI and copy its one-time ingest value when it appears. Telltale stores only its hash and cannot show the value again.',
                 'code' => null,
+                'creates_app' => true,
             ],
             [
                 'title' => 'Install the client',

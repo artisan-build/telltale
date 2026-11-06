@@ -6,6 +6,9 @@ use App\Console\Commands\PruneRawEvents;
 use App\Mcp\TelltaleMcpServer;
 use App\Mcp\Tools\ActiveUsers;
 use App\Mcp\Tools\Apps;
+use App\Mcp\Tools\CrashDetail;
+use App\Mcp\Tools\CrashFreeUsers;
+use App\Mcp\Tools\CrashGroups;
 use App\Mcp\Tools\DeleteInstall;
 use App\Mcp\Tools\ErrorDetail;
 use App\Mcp\Tools\Errors;
@@ -73,6 +76,9 @@ it('passes the version 1 reference-consumer conformance spec', function (): void
 
     $delegatedTools = [
         Apps::class,
+        CrashDetail::class,
+        CrashFreeUsers::class,
+        CrashGroups::class,
         IngestHealth::class,
         EventCounts::class,
         ActiveUsers::class,
@@ -89,6 +95,10 @@ it('passes the version 1 reference-consumer conformance spec', function (): void
         RotateIngestKey::class,
     ];
     $delegatedArguments = [
+        CrashDetail::class => [
+            'app_id' => 1,
+            'event_id' => '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        ],
         DeleteInstall::class => [
             'app_id' => 1,
             'install_id' => '10000000-0000-4000-8000-000000000001',

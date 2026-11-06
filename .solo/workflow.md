@@ -16,11 +16,11 @@ applications. The monorepo contains its server, versioned contracts, and device-
 
 - command: `composer ready`
 - order: IDE helper generation, Rector, root Pint, package Pint, root PHPStan/Larastan, package
-  PHPStan, root Pest, both package Pest suites, root Composer audit, and both package audits.
+  PHPStan, root Pest, all three package Pest suites, root Composer audit, and all three package audits.
 - package suites: `composer packages:lint:check`, `composer packages:stan`,
   `composer packages:test`, and `composer packages:audit`.
 - monorepo: the Laravel server is at root; path repositories are
-  `packages/telltale-contracts` and `packages/telltale-client`.
+  `packages/telltale-contracts`, `packages/telltale-client` and `packages/telltale-crashes`.
 
 Run the full hard gate once on the committed candidate with a clean tree. While work is in
 progress, run only the focused tests covering the changed files, then static analysis and lint once
@@ -30,9 +30,14 @@ before finalizing.
 
 - status: defined; verified on the pull request.
 - exact required contexts: `server (8.5)`, `client (8.4)`, `client (8.5)`, and `quality`.
+- proposed additional protection contexts: `crashes (8.4)`, `crashes (8.5)`,
+  `crashes native (ios)` and `crashes native (android)`; protection is a maintainer step.
 - `.github/workflows/tests.yml`: the `server (8.5)` job runs root and contracts checks on PHP
   8.5 against PostgreSQL 16; standalone client jobs run client static analysis, Pest, and audit on
   PHP 8.4 and 8.5 without PostgreSQL.
+- Standalone crash PHP jobs run static analysis, Pest and audit on PHP 8.4 and 8.5. The existing
+  `tests (lowest deps) - Laravel 11`, `12` and `13` lanes also run crash-package tests. Native jobs
+  compile actual sources with bridge stubs and run harnesses, not full NativePHP apps or device probes.
 - `.github/workflows/lint.yml`: root and package Pint checks on PHP 8.5.
 - both workflows target pushes and pull requests to `main`.
 
@@ -44,6 +49,7 @@ literal strings.
 - root: `composer install --no-interaction --prefer-dist`
 - contracts: `composer -d packages/telltale-contracts install --no-interaction --prefer-dist`
 - client: `composer -d packages/telltale-client install --no-interaction --prefer-dist`
+- crashes: `composer -d packages/telltale-crashes install --no-interaction --prefer-dist`
 - local post-install: copy `.env.example` to `.env`, run `php artisan key:generate`, and migrate.
 - PostgreSQL prerequisites: local databases `telltale` and `telltale_app_test`; the server CI job
   creates `telltale_app_test` through its PostgreSQL 16 service. Client CI jobs do not use PostgreSQL.
@@ -56,10 +62,11 @@ literal strings.
 
 - branch naming: `feat/<slug>` (`fix/<slug>` for fixes, `chore/<slug>` for maintenance)
 - PR target: `artisan-build/telltale`, branch `main`
-- release trigger: tags matching `v*` run `.github/workflows/release.yml` and `kibble:split` both
-  packages in lockstep.
+- release trigger: tags matching `v*` run `.github/workflows/release.yml` and `kibble:split`
+  all three packages in lockstep.
 - release prerequisites: seed the read-only `artisan-build/telltale-contracts` and
-  `artisan-build/telltale-client` mirrors and grant a fine-grained `SPLIT_REPO_TOKEN` with Contents:
+  `artisan-build/telltale-client` mirrors, create the `artisan-build/telltale-crashes` mirror, and grant
+  the fine-grained `SPLIT_REPO_TOKEN` access to all three with Contents:
   write before any tag is pushed. Do not create mirrors or tags as part of ordinary feature work.
 
 ## Built For Cloud App
@@ -78,4 +85,4 @@ literal strings.
   `php artisan tailwind:optimize` and commit the output.
 - `composer ready` regenerates committed IDE helper files. `.phpstorm.meta.php` remains ignored.
 - Keep `phpstan-baseline.neon` empty.
-- Client real-device verification is blocked until the later Dreiland integration has Xcode.
+- Client and crash real-device verification remain a later, separately approved integration step.

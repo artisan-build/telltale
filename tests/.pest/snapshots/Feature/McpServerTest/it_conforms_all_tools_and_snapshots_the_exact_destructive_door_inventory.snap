@@ -9,6 +9,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Apps",
             "readOnlyHint": true
         },
         "_meta": {
@@ -40,6 +41,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Ingest Health",
             "readOnlyHint": true
         },
         "_meta": {
@@ -90,6 +92,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Event Counts",
             "readOnlyHint": true
         },
         "_meta": {
@@ -119,6 +122,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Active Users",
             "readOnlyHint": true
         },
         "_meta": {
@@ -150,6 +154,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Release Adoption",
             "readOnlyHint": true
         },
         "_meta": {
@@ -187,6 +192,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Screen Flow",
             "readOnlyHint": true
         },
         "_meta": {
@@ -235,6 +241,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Funnel",
             "readOnlyHint": true
         },
         "_meta": {
@@ -266,6 +273,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Retention",
             "readOnlyHint": true
         },
         "_meta": {
@@ -297,6 +305,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Sessions",
             "readOnlyHint": true
         },
         "_meta": {
@@ -339,6 +348,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Errors",
             "readOnlyHint": true
         },
         "_meta": {
@@ -370,6 +380,113 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Error Detail",
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "crash_groups",
+        "title": "Crash Groups",
+        "description": "List app-scoped crash groups in a retained UTC half-open window, with occurrence totals and distinct installs.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "from": {
+                    "format": "date-time",
+                    "type": "string"
+                },
+                "to": {
+                    "format": "date-time",
+                    "type": "string"
+                },
+                "limit": {
+                    "default": 25,
+                    "minimum": 1,
+                    "maximum": 50,
+                    "type": "integer"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "title": "Crash Groups",
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "crash_detail",
+        "title": "Crash Detail",
+        "description": "Return one retained app-scoped crash event, including bounded frames and binary symbol inputs.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "event_id": {
+                    "minLength": 26,
+                    "maxLength": 26,
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id",
+                "event_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "title": "Crash Detail",
+            "readOnlyHint": true
+        },
+        "_meta": {
+            "classification": "content",
+            "effect": "read"
+        }
+    },
+    {
+        "name": "crash_free_users",
+        "title": "Crash Free Users",
+        "description": "Return an observed install-based crash-free proxy from retained ordinary and crash events, with OS coverage caveats.",
+        "inputSchema": {
+            "properties": {
+                "app_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "from": {
+                    "format": "date-time",
+                    "type": "string"
+                },
+                "to": {
+                    "format": "date-time",
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "required": [
+                "app_id"
+            ],
+            "additionalProperties": false
+        },
+        "annotations": {
+            "title": "Crash Free Users",
             "readOnlyHint": true
         },
         "_meta": {
@@ -411,6 +528,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Install Timeline",
             "readOnlyHint": true
         },
         "_meta": {
@@ -446,6 +564,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Delete Install",
             "destructiveHint": true
         },
         "_meta": {
@@ -485,6 +604,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Revoke Install",
             "destructiveHint": true
         },
         "_meta": {
@@ -518,6 +638,7 @@
             "additionalProperties": false
         },
         "annotations": {
+            "title": "Rotate Ingest Key",
             "destructiveHint": true
         },
         "_meta": {
