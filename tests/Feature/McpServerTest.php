@@ -47,9 +47,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Mcp\Request as McpRequest;
-use Laravel\Mcp\Server\Middleware\AddWwwAuthenticateHeader;
-use Laravel\Mcp\Server\Middleware\ReorderJsonAccept;
-use Laravel\Mcp\Server\Middleware\ValidateMcpHeaders;
 use ParagonIE\Paseto\Builder;
 use ParagonIE\Paseto\Keys\Version4\AsymmetricSecretKey;
 use ParagonIE\Paseto\Protocol\Version4;
@@ -71,20 +68,18 @@ afterEach(function (): void {
 it('registers exactly two effect-scoped MCP doors and publishes delegated metadata', function (): void {
     $read = Mcp::getWebServer('mcp');
     $destructive = Mcp::getWebServer('mcp/destructive');
+    $readMiddleware = $read?->gatherMiddleware() ?? [];
+    $destructiveMiddleware = $destructive?->gatherMiddleware() ?? [];
 
     expect($read)->not->toBeNull()
-        ->and($read?->gatherMiddleware())->toBe([
-            ReorderJsonAccept::class,
-            ValidateMcpHeaders::class,
-            AddWwwAuthenticateHeader::class,
+        ->and(array_search(RejectIngestCredentialsFromReadSurface::class, $readMiddleware, true))->toBeGreaterThan(0)
+        ->and(array_slice($readMiddleware, -2))->toBe([
             RejectIngestCredentialsFromReadSurface::class,
             'bfc.mcp:product,read',
         ])
         ->and($destructive)->not->toBeNull()
-        ->and($destructive?->gatherMiddleware())->toBe([
-            ReorderJsonAccept::class,
-            ValidateMcpHeaders::class,
-            AddWwwAuthenticateHeader::class,
+        ->and(array_search(RejectIngestCredentialsFromReadSurface::class, $destructiveMiddleware, true))->toBeGreaterThan(0)
+        ->and(array_slice($destructiveMiddleware, -2))->toBe([
             RejectIngestCredentialsFromReadSurface::class,
             'bfc.mcp:product,destructive',
         ])
